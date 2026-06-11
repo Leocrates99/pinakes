@@ -62,22 +62,27 @@ Pinakes/
 
 ## Identità visiva
 
-Il restyling **fase 2** riprende e adatta i motivi estetico-grafici di *Poetrify Translator*
-(non una copia 1:1), vestendoli per una biblioteca personale:
+L'interfaccia è **allineata e armonizzata con *Poetrify Translator***: stessa famiglia visiva,
+così i due progetti si riconoscono come affini.
 
-- **Tipografia editoriale**: `Playfair Display` (titoli) · `Source Serif 4` (testo di lettura:
-  autori, note, descrizioni) · `Source Sans 3` (interfaccia, etichette maiuscolette spaziate) ·
-  `JetBrains Mono` (segnatura, ISBN, codici).
+- **Tipografia editoriale** (identica a Poetrify): `Playfair Display` (titoli) · `Source Serif 4`
+  (testo di lettura: autori, note, descrizioni) · `Source Sans 3` (interfaccia, etichette
+  maiuscolette spaziate) · `JetBrains Mono` (segnatura, ISBN, codici).
 - **Palette**: carta **avorio** `#fcfbf8`, inchiostro `#2c3539`, seppia `#6b6660`, regole sottili
-  `#eae8e2`. Accento proprio di Pinakes = **cremisi** `#a22e37` (pelle/biblioteca) + **ocra**
-  `#9c6b3c`; l'**indaco** `#1800ac` di Poetrify resta come colore-dato secondario (grafici).
-- **Motivi ripresi**: etichette maiuscolette, regole sottili, **barra-accento a sinistra** sulle
-  card (statistiche, riquadro collocazione), badge a **pill**, hover con bordo-accento e
-  sollevamento, ombre tenui, tab attivo con barra-accento.
-- **Dark mode** con palette scura coordinata (paper `#1c1f24`, accento rosa `#e0848f`).
+  `#eae8e2`. Accento primario = **indaco `#1800ac`** — lo stesso «asse del brand di servizio» di
+  Poetrify (brand, tab attive, pulsanti, focus, hover). L'**ocra `#9c6b3c`** resta accento caldo
+  (stelle valutazione); il **cremisi `#a22e37`** è tenuto come token secondario (`--accent-lat`).
+- **Masthead chiaro** come la topbar di Poetrify: sfondo paper, bordo inferiore + ombra leggera,
+  brand «Pinakes» in indaco Playfair a sinistra con sottotitolo corsivo seppia, controlli a destra.
+- **Motivi ripresi**: sfondo a gradiente `paper→avorio`, raggi stretti (6/10px), **nav-tab come
+  segmented control** indaco pieno, etichette maiuscolette, regole sottili, **barra-accento a
+  sinistra** sulle card (statistiche, riquadro collocazione), badge a **pill**, hover bordo-accento
+  con sollevamento, ombre tenui.
+- **Dark mode** sulla palette scura di Poetrify (paper `#1c1f24`, accento lavanda `#8b7dff`,
+  masthead con gradiente indaco `#2a2541 → #1a1530`).
 
-I token sono definiti come variabili CSS in `:root` / `[data-theme="dark"]`; un blocco
-«MOTIVI POETRIFY» in coda al `<style>` raccoglie le rifiniture editoriali.
+I token sono variabili CSS in `:root` / `[data-theme="dark"]`; un blocco «MOTIVI POETRIFY» in coda
+al `<style>` raccoglie le rifiniture editoriali.
 
 ---
 
