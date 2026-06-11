@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pinakes">
+  <rect width="512" height="512" rx="92" fill="#1a1a2e"/>
+  <g>
+    <!-- mensola -->
+    <rect x="115" y="379" width="282" height="10" rx="5" fill="#daa520"/>
+    <!-- dorsi -->
+    <rect x="150" y="215" width="51" height="164" rx="6" fill="#cd853f"/>
+    <rect x="155" y="251" width="41" height="15" rx="3" fill="#f5f0e6"/>
+    <rect x="207" y="172" width="46" height="207" rx="6" fill="#b8860b"/>
+    <rect x="212" y="210" width="36" height="16" rx="3" fill="#f5f0e6"/>
+    <rect x="259" y="236" width="51" height="143" rx="6" fill="#2d6a4f"/>
+    <rect x="265" y="266" width="39" height="14" rx="3" fill="#f5f0e6"/>
+    <rect x="316" y="194" width="45" height="185" rx="6" fill="#8b4513"/>
+    <rect x="321" y="230" width="35" height="15" rx="3" fill="#f5f0e6"/>
+  </g>
+</svg>

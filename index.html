@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Pinakes — La mia biblioteca</title>
+    <meta name="description" content="Pinakes: inventario e archivio digitale della tua biblioteca fisica. Scansione ISBN dal telefono, classificazione Dewey con segnatura automatica, collocazione sugli scaffali e statistiche di lettura.">
+    <!-- PWA / app installabile -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="color-scheme" content="light dark">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pinakes">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --ink:#2c3539;--ink-light:#4a5568;--ink-muted:#6b6660;
+            --parchment:#fcfbf8;--parchment-dark:#eae8e2;--cream:#ffffff;
+            --accent:#a22e37;--accent-light:#b8434c;--accent-warm:#9c6b3c;--accent-glow:rgba(162,46,55,.08);
+            --gold:#9c6b3c;--gold-light:#c79a5e;
+            --success:#2f855a;--success-light:#dcefe2;
+            --info:#1800ac;--info-light:#ede9fc;
+            --warning:#b9791f;--warning-light:#f6ecd6;
+            --danger:#c53030;--danger-light:#f6dcdc;
+            --shadow-sm:0 1px 3px rgba(44,53,57,.06);--shadow:0 6px 22px rgba(44,53,57,.09);--shadow-lg:0 14px 40px rgba(44,53,57,.14);
+            --radius:7px;--radius-lg:12px;--transition:.2s cubic-bezier(.4,0,.2,1);
+            --font-display:'Playfair Display',Georgia,'Times New Roman',serif;
+            --font-body:'Source Serif 4',Georgia,serif;
+            --font-ui:'Source Sans 3',system-ui,-apple-system,sans-serif;
+            --font-mono:'JetBrains Mono',Consolas,monospace;
+        }
+        /* ═══ #19 DARK MODE ═══ */
+        [data-theme="dark"]{
+            --ink:#e8e6e1;--ink-light:#c8c5be;--ink-muted:#a8a39b;
+            --parchment:#232730;--parchment-dark:#2f3340;--cream:#1c1f24;
+            --accent:#e0848f;--accent-light:#ec98a2;--accent-warm:#d6a071;--accent-glow:rgba(224,132,143,.14);
+            --gold:#d6a071;--gold-light:#e3b483;
+            --success:#4ade80;--success-light:rgba(74,222,128,.16);
+            --info:#8b7dff;--info-light:rgba(139,125,255,.16);
+            --warning:#fbbf24;--warning-light:rgba(251,191,36,.16);
+            --danger:#f87171;--danger-light:rgba(248,113,113,.18);
+            --shadow-sm:0 1px 3px rgba(0,0,0,.3);--shadow:0 6px 22px rgba(0,0,0,.4);--shadow-lg:0 14px 40px rgba(0,0,0,.5);
+        }
+        [data-theme="dark"] header{background:#15171c}
+        [data-theme="dark"] .book-cover-area{background:linear-gradient(135deg,#2a2e38,#1c1f24)}
+        [data-theme="dark"] .shelf-books{background:linear-gradient(to bottom,#2a2e38,#1c1f24)}
+        [data-theme="dark"] .chart-box canvas{filter:brightness(.95)}
+
+        body{font-family:'Source Sans 3',sans-serif;background:var(--parchment);color:var(--ink);line-height:1.6;min-height:100vh;transition:background .3s,color .3s}
+        h1,h2,h3,h4{font-family:'Playfair Display',serif;font-weight:600;letter-spacing:-.01em}
+
+        /* HEADER */
+        header{background:var(--ink);color:var(--parchment);padding:2rem 0 1.5rem;position:relative;overflow:hidden;transition:background .3s}
+        header::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 80px,rgba(255,255,255,.02) 80px,rgba(255,255,255,.02) 81px);pointer-events:none}
+        .header-inner{display:flex;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;position:relative}
+        header h1{text-align:center;font-size:clamp(1.6rem,4vw,2.6rem);font-weight:300;letter-spacing:.04em}
+        header h1 strong{font-weight:700;color:var(--accent-warm)}
+        header h1 .brand-sub{font-family:var(--font-ui);font-size:.32em;font-weight:600;font-style:normal;text-transform:uppercase;letter-spacing:.24em;opacity:.7;white-space:nowrap;vertical-align:middle}
+        @media(max-width:480px){header h1 .brand-sub{display:block;font-size:.62rem;margin-top:.35rem;letter-spacing:.2em}}
+        .header-controls{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:.5rem}
+        .theme-toggle{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:var(--parchment);border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+        .theme-toggle:hover{background:rgba(255,255,255,.2)}
+        .header-stats{display:flex;justify-content:center;gap:1.5rem;margin-top:1.25rem;flex-wrap:wrap}
+        .stat-pill{text-align:center;padding:.4rem 1rem;border:1px solid rgba(255,255,255,.12);border-radius:30px;background:rgba(255,255,255,.04)}
+        .stat-pill .num{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;display:block}
+        .stat-pill .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.7}
+
+        .container{max-width:1400px;margin:0 auto;padding:1.5rem}
+
+        /* TABS */
+        .nav-tabs{display:flex;gap:.25rem;margin-bottom:2rem;background:var(--cream);padding:.5rem;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow-x:auto;scrollbar-width:none}
+        .nav-tabs::-webkit-scrollbar{display:none}
+        .tab-btn{padding:.6rem 1.2rem;border:none;background:0;color:var(--ink-muted);border-radius:var(--radius);cursor:pointer;font:500 .88rem 'Source Sans 3',sans-serif;white-space:nowrap;transition:var(--transition)}
+        .tab-btn:hover{color:var(--ink);background:var(--parchment-dark)}
+        .tab-btn.active{background:var(--ink);color:var(--parchment);box-shadow:var(--shadow-sm)}
+        .tab-panel{display:none;animation:fadeUp .35s ease}
+        .tab-panel.active{display:block}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        /* TOOLBAR */
+        .toolbar{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+        .search-wrap{flex:1;min-width:200px;position:relative}
+        .search-wrap svg{position:absolute;left:.75rem;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--ink-muted);fill:none;stroke-width:2}
+        .search-wrap input{width:100%;padding:.65rem 1rem .65rem 2.5rem;border:1px solid var(--parchment-dark);border-radius:var(--radius);font:.9rem 'Source Sans 3',sans-serif;background:var(--cream);color:var(--ink);transition:var(--transition)}
+        .search-wrap input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+        .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.1rem;border:1px solid transparent;border-radius:var(--radius);cursor:pointer;font:500 .88rem 'Source Sans 3',sans-serif;transition:var(--transition);white-space:nowrap;text-decoration:none;color:var(--ink)}
+        .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+        .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{background:var(--accent-light)}
+        .btn-outline{border-color:var(--parchment-dark);background:var(--cream);color:var(--ink)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+        .btn-success{background:var(--success);color:#fff}
+        .btn-danger{background:var(--danger);color:#fff}
+        .btn-sm{padding:.4rem .7rem;font-size:.8rem}
+        .btn-icon{background:var(--cream);border:1px solid var(--parchment-dark);padding:.5rem;font-size:1rem;border-radius:var(--radius);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);width:36px;height:36px;color:var(--ink-muted)}
+        .btn-icon.active,.btn-icon:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+
+        /* FILTERS */
+        .filters-bar{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+        .filter-select{padding:.5rem .75rem;border:1px solid var(--parchment-dark);border-radius:var(--radius);font:.85rem 'Source Sans 3',sans-serif;background:var(--cream);color:var(--ink);cursor:pointer;transition:var(--transition)}
+        .filter-select:focus{outline:none;border-color:var(--accent)}
+        .filter-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-muted);font-weight:600}
+        .sort-direction{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius);padding:.5rem;cursor:pointer;font-size:1rem;line-height:1;transition:var(--transition);color:var(--ink)}
+        .sort-direction:hover{border-color:var(--accent)}
+
+        /* ═══ BOOK GRID ═══ */
+        .books-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem}
+        .book-card{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius-lg);overflow:hidden;transition:var(--transition);position:relative;cursor:pointer}
+        .book-card:hover{box-shadow:var(--shadow);transform:translateY(-3px)}
+        /* #21 Highlight animation for newly saved books */
+        .book-card.just-saved{animation:highlightPulse 2s ease}
+        @keyframes highlightPulse{0%{box-shadow:0 0 0 0 rgba(218,165,32,.6)}30%{box-shadow:0 0 0 8px rgba(218,165,32,.2)}100%{box-shadow:none}}
+        .book-card-inner{padding:1.25rem}
+        .book-cover-area{height:200px;background:linear-gradient(135deg,var(--parchment-dark),var(--parchment));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+        .book-cover-area img{height:100%;width:100%;object-fit:contain;padding:.75rem}
+        .book-cover-placeholder{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink-muted);text-align:center;padding:1rem;font-style:italic}
+        .badge{display:inline-block;padding:.15rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.03em}
+        .badge-letto{background:var(--success-light);color:var(--success)}.badge-in-corso{background:var(--warning-light);color:var(--warning)}.badge-da-leggere{background:var(--info-light);color:var(--info)}.badge-abbandonato{background:var(--danger-light);color:var(--danger)}
+        .book-title-text{font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:600;margin:.5rem 0 .2rem;color:var(--ink)}
+        .book-author-text{font-size:.88rem;color:var(--ink-muted);margin-bottom:.5rem}
+        .book-meta{display:flex;flex-wrap:wrap;gap:.5rem;font-size:.8rem;color:var(--ink-muted);margin-top:.5rem}
+        .book-meta span{display:flex;align-items:center;gap:.2rem}
+        .stars{color:var(--gold);font-size:.85rem;letter-spacing:1px}.stars .empty{color:var(--parchment-dark)}
+        .book-actions-bar{display:flex;gap:.5rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--parchment-dark)}
+        .book-actions-bar .btn{flex:1;justify-content:center}
+        .book-location-badge{display:inline-block;background:var(--parchment);border:1px solid var(--parchment-dark);border-radius:4px;padding:.1rem .4rem;font-family:monospace;font-size:.75rem;color:var(--accent);font-weight:600;margin-top:.3rem}
+
+        /* ═══ #1 LIST VIEW ═══ */
+        .books-grid.list-view{display:flex;flex-direction:column;gap:.5rem}
+        .books-grid.list-view .book-card{display:grid;grid-template-columns:60px 1fr auto;border-radius:var(--radius);overflow:hidden}
+        .books-grid.list-view .book-cover-area{height:80px;width:60px}
+        .books-grid.list-view .book-card-inner{padding:.75rem 1rem;display:flex;flex-direction:column;justify-content:center}
+        .books-grid.list-view .book-title-text{font-size:1rem;margin:.1rem 0}
+        .books-grid.list-view .book-author-text{margin-bottom:.2rem;font-size:.82rem}
+        .books-grid.list-view .book-meta{display:none}
+        .books-grid.list-view .book-actions-bar{border:none;padding:0;margin:0;flex-direction:column;justify-content:center;align-items:flex-end;gap:.35rem;padding-right:.75rem}
+        .books-grid.list-view .stars{font-size:.75rem}
+        .books-grid.list-view .book-location-badge{display:none}
+
+        /* ═══ MODAL ═══ */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(26,26,46,.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;padding:1rem}
+        .modal-overlay.open{display:flex}
+        .modal-box{background:var(--cream);border-radius:var(--radius-lg);width:100%;max-width:820px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:modalIn .3s ease}
+        @keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid var(--parchment-dark)}
+        .modal-header h2{font-size:1.3rem}
+        .modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--ink-muted);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+        .modal-close:hover{background:var(--parchment-dark);color:var(--ink)}
+        .modal-body{padding:1.5rem}
+        .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+        .form-group{display:flex;flex-direction:column}
+        .form-group.full{grid-column:1/-1}
+        .form-group label{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);margin-bottom:.35rem}
+        .form-group input,.form-group select,.form-group textarea{padding:.6rem .75rem;border:1px solid var(--parchment-dark);border-radius:var(--radius);font:.9rem 'Source Sans 3',sans-serif;background:var(--parchment);color:var(--ink);transition:var(--transition)}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+        .form-group textarea{resize:vertical;min-height:80px}
+        .isbn-lookup-row{display:flex;gap:.5rem}.isbn-lookup-row input{flex:1}
+        .form-actions{display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--parchment-dark)}
+
+        /* ISBN PREVIEW */
+        .isbn-preview{display:none;background:var(--parchment);border:1px solid var(--parchment-dark);border-radius:var(--radius);padding:1rem;margin-top:.75rem;gap:1rem;align-items:flex-start}
+        .isbn-preview.show{display:flex}
+        .isbn-preview img{width:90px;height:auto;border-radius:4px;flex-shrink:0;box-shadow:var(--shadow-sm)}
+        .isbn-preview-info{flex:1}
+        .isbn-preview-info h4{font-size:1rem;margin-bottom:.2rem}
+        .isbn-preview-info p{font-size:.85rem;color:var(--ink-muted)}
+        .isbn-source{display:inline-block;font-size:.7rem;padding:.1rem .4rem;border-radius:3px;background:var(--info-light);color:var(--info);font-weight:600;margin-top:.3rem}
+
+        /* AUTO LOCATION */
+        .auto-location-box{background:var(--accent-glow);border:1px solid var(--accent-warm);border-radius:var(--radius);padding:.75rem 1rem;margin-top:.5rem;display:none}
+        .auto-location-box.show{display:block}
+        .auto-location-code{font-family:monospace;font-size:1.1rem;font-weight:700;color:var(--accent);letter-spacing:.05em}
+
+        /* ═══ #2 DETAIL MODAL ═══ */
+        .detail-grid{display:grid;grid-template-columns:180px 1fr;gap:1.5rem}
+        .detail-cover{width:100%;border-radius:var(--radius);box-shadow:var(--shadow)}
+        .detail-cover-placeholder{width:100%;aspect-ratio:2/3;background:var(--parchment-dark);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-style:italic;color:var(--ink-muted);padding:1rem;text-align:center}
+        .detail-title{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:.25rem}
+        .detail-author{font-size:1.1rem;color:var(--ink-muted);margin-bottom:.75rem}
+        .detail-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;margin:.75rem 0}
+        .detail-info-item{font-size:.88rem}
+        .detail-info-item .di-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);font-weight:600;display:block}
+        .detail-notes{background:var(--parchment);border-radius:var(--radius);padding:.75rem;font-size:.88rem;margin-top:.75rem;font-style:italic;white-space:pre-wrap}
+
+        /* ═══ #3 CUSTOM CONFIRM ═══ */
+        .confirm-box{max-width:400px;text-align:center}
+        .confirm-box .modal-body{padding:2rem 1.5rem}
+        .confirm-box .confirm-icon{font-size:2.5rem;margin-bottom:.75rem;opacity:.7}
+        .confirm-box .confirm-title{font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:.5rem}
+        .confirm-box .confirm-msg{font-size:.9rem;color:var(--ink-muted);margin-bottom:1.25rem}
+        .confirm-box .confirm-actions{display:flex;gap:.75rem;justify-content:center}
+
+        /* SCANNER */
+        .scanner-area{width:100%;max-width:480px;margin:0 auto;text-align:center}
+        #scanner-viewport{width:100%;aspect-ratio:4/3;background:#111;border-radius:var(--radius-lg);overflow:hidden;position:relative;margin-bottom:1rem}
+        #scanner-viewport video,#scanner-viewport canvas{width:100%!important;height:100%!important;object-fit:cover}
+        .scanner-guide{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70%;height:35%;border:2px solid rgba(205,133,63,.8);border-radius:8px;pointer-events:none;z-index:5}
+        .scanner-guide::after{content:'';position:absolute;left:0;right:0;height:2px;background:var(--accent-warm);animation:scanLine 2s ease-in-out infinite}
+        @keyframes scanLine{0%,100%{top:10%}50%{top:90%}}
+
+        /* STATS */
+        .stats-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:2rem}
+        .stat-card{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius-lg);padding:1.25rem;text-align:center;transition:var(--transition)}
+        .stat-card:hover{box-shadow:var(--shadow)}
+        .stat-card .icon{font-size:1.8rem;margin-bottom:.4rem}
+        .stat-card .value{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:700;color:var(--accent)}
+        .stat-card .label{font-size:.72rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.05em}
+        .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;margin-bottom:2rem}
+        .chart-box{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius-lg);padding:1.25rem}
+        .chart-box h3{font-size:1.05rem;margin-bottom:1rem;color:var(--ink)}
+        .chart-box canvas{width:100%!important;max-height:260px}
+
+        /* ═══ SHELVING ═══ */
+        .shelving-section{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
+        .shelving-section h3{margin-bottom:1rem;font-size:1.2rem}
+        .shelving-explanation{background:var(--accent-glow);border-left:3px solid var(--accent);padding:1rem 1.25rem;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:1.5rem;font-size:.9rem;line-height:1.7}
+        .shelf-filter-bar{display:flex;gap:.5rem;margin-bottom:1rem;align-items:center;flex-wrap:wrap}
+        .shelf-row{display:flex;align-items:stretch;gap:0;margin-bottom:1.25rem;border:1px solid var(--parchment-dark);border-radius:var(--radius);overflow:visible;position:relative}
+        .shelf-category-label{writing-mode:vertical-lr;text-orientation:mixed;transform:rotate(180deg);color:var(--parchment);padding:.75rem .5rem;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;min-width:30px;border-radius:var(--radius) 0 0 var(--radius);flex-shrink:0}
+        .shelf-scroll-wrap{flex:1;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--parchment-dark) transparent;border-radius:0 var(--radius) var(--radius) 0}
+        .shelf-scroll-wrap::-webkit-scrollbar{height:6px}
+        .shelf-scroll-wrap::-webkit-scrollbar-thumb{background:var(--parchment-dark);border-radius:3px}
+        .shelf-books{display:flex;gap:2px;padding:2rem .75rem .75rem;background:linear-gradient(to bottom,var(--parchment),var(--parchment-dark));align-items:flex-end;min-height:120px;position:relative}
+        .shelf-book{flex-shrink:0;width:30px;min-height:70px;border-radius:2px 3px 3px 2px;cursor:pointer;position:relative;transition:var(--transition);display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.12)}
+        .shelf-book:hover,.shelf-book.active{transform:translateY(-10px) scale(1.1);z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+        .shelf-book.highlighted{animation:shelfPulse 1.5s ease 3;z-index:40}
+        @keyframes shelfPulse{0%,100%{box-shadow:0 0 0 0 rgba(218,165,32,0)}50%{box-shadow:0 0 0 6px rgba(218,165,32,.5)}}
+        .shelf-book .spine-text{writing-mode:vertical-lr;text-orientation:mixed;transform:rotate(180deg);font-size:.55rem;font-weight:600;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-height:calc(100% - 14px);padding:2px;pointer-events:none}
+        /* #10 Status dot on spine */
+        .shelf-book .status-dot{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;border:1px solid rgba(255,255,255,.4)}
+        .status-dot.st-letto{background:#2d6a4f}.status-dot.st-in-corso{background:#e76f51}.status-dot.st-da-leggere{background:#457b9d}.status-dot.st-abbandonato{background:#9b2226}
+
+        /* Floating tooltip */
+        .shelf-tooltip{position:fixed;z-index:9000;background:var(--ink);color:var(--parchment);padding:.65rem 1rem;border-radius:var(--radius-lg);font-size:.82rem;line-height:1.5;box-shadow:var(--shadow-lg);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;max-width:260px;white-space:normal}
+        .shelf-tooltip.visible{opacity:1;transform:translateY(0)}
+        .shelf-tooltip strong{display:block;font-size:.92rem;margin-bottom:.15rem}
+        .shelf-tooltip .tt-loc{display:inline-block;margin-top:.3rem;padding:.1rem .4rem;background:rgba(255,255,255,.15);border-radius:3px;font-family:monospace;font-size:.75rem;letter-spacing:.03em}
+        .shelf-tooltip .tt-btn{display:inline-block;margin-top:.4rem;padding:.2rem .5rem;background:var(--accent);color:#fff;border-radius:3px;font-size:.72rem;cursor:pointer;pointer-events:auto}
+        .shelf-tooltip::after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:-6px;border:6px solid transparent;border-top-color:var(--ink)}
+        .shelf-tooltip.below::after{bottom:auto;top:-6px;border-top-color:transparent;border-bottom-color:var(--ink)}
+
+        .suggestion-card{background:var(--cream);border:2px solid var(--gold-light);border-radius:var(--radius-lg);padding:1.5rem;margin-top:1rem}
+        .suggestion-card h4{color:var(--gold);margin-bottom:.75rem;font-size:1.1rem}
+        .suggestion-neighbors{display:flex;align-items:center;gap:.5rem;margin-top:1rem;flex-wrap:wrap;justify-content:center}
+        .neighbor-book{background:var(--parchment);border:1px solid var(--parchment-dark);border-radius:var(--radius);padding:.5rem .75rem;font-size:.85rem;text-align:center;min-width:120px}
+        .neighbor-book.target{background:var(--accent-glow);border-color:var(--accent);font-weight:600}
+        .neighbor-arrow{font-size:1.2rem;color:var(--ink-muted)}
+
+        /* BACKUP */
+        .backup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem}
+        .backup-card{background:var(--cream);border:1px solid var(--parchment-dark);border-radius:var(--radius-lg);padding:1.5rem;text-align:center;cursor:pointer;transition:var(--transition)}
+        .backup-card:hover{border-color:var(--accent);box-shadow:var(--shadow);transform:translateY(-2px)}
+        .backup-card .b-icon{font-size:2rem;margin-bottom:.5rem}
+        .backup-card .b-title{font-weight:600;margin-bottom:.25rem;font-size:.9rem}
+        .backup-card .b-desc{font-size:.78rem;color:var(--ink-muted)}
+
+        /* TOAST */
+        .toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem}
+        .toast{padding:.75rem 1.25rem;border-radius:var(--radius);color:#fff;font-size:.88rem;box-shadow:var(--shadow);animation:toastIn .3s ease,toastOut .3s ease 2.7s forwards;max-width:360px}
+        .toast-success{background:var(--success)}.toast-error{background:var(--danger)}.toast-info{background:var(--info)}
+        @keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes toastOut{to{opacity:0;transform:translateX(40px)}}
+        .empty-state{text-align:center;padding:3rem 1rem;color:var(--ink-muted)}.empty-state .e-icon{font-size:3rem;margin-bottom:1rem;opacity:.4}
+        .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        /* ═══ #20 BACK TO TOP ═══ */
+        .back-to-top{position:fixed;bottom:1.5rem;left:1.5rem;z-index:900;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:1.3rem;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(20px);pointer-events:none;transition:var(--transition)}
+        .back-to-top.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+
+        /* ═══ #22 PRINT STYLESHEET ═══ */
+        @media print{
+            body{background:#fff!important;color:#000!important}
+            header,.nav-tabs,.toolbar,.filters-bar,.book-actions-bar,.modal-overlay,.toast-container,.back-to-top,.btn,.scanner-area,.header-controls{display:none!important}
+            .container{max-width:100%;padding:0}
+            .tab-panel{display:block!important}
+            #panel-catalog{page-break-after:always}
+            #panel-shelving,#panel-stats,#panel-backup{display:none!important}
+            .books-grid{display:table!important;width:100%;border-collapse:collapse}
+            .book-card{display:table-row!important;border:none!important;border-radius:0!important;page-break-inside:avoid;box-shadow:none!important;transform:none!important}
+            .book-cover-area{display:none!important}
+            .book-card-inner{display:table-cell!important;padding:.4rem .6rem!important;border-bottom:1px solid #ddd;vertical-align:middle}
+            .book-location-badge{border:1px solid #999}
+            .badge{border:1px solid currentColor}
+            .stat-pill{border:1px solid #999;background:#f5f5f5!important}
+            .header-stats{display:flex!important;justify-content:flex-start;gap:1rem;margin:0 0 1rem;padding:0}
+            .stat-pill .num{font-size:1.2rem;color:#000!important}
+        }
+
+        /* ═══ TABLET (≤1024px) ═══ */
+        @media(max-width:1024px){
+            .books-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+            .charts-row{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
+            .stats-overview{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+            .header-stats{gap:1rem}.stat-pill{padding:.4rem .9rem}.stat-pill .num{font-size:1.3rem}
+            .suggestion-neighbors{gap:.35rem}.neighbor-book{min-width:100px;font-size:.8rem;padding:.4rem .5rem}
+            .shelving-section{padding:1rem}.shelf-book{width:26px}
+            .detail-grid{grid-template-columns:140px 1fr;gap:1rem}
+        }
+
+        /* ═══ PHONE (≤768px) ═══ */
+        @media(max-width:768px){
+            .container{padding:.6rem}
+            header{padding:1.5rem 0 1.25rem}
+            header h1{font-size:1.3rem;letter-spacing:.02em}
+            .header-controls{position:static;transform:none;justify-content:center;margin-top:.5rem}
+            .header-stats{gap:.5rem;margin-top:.75rem}
+            .stat-pill{padding:.25rem .55rem;border-radius:20px}.stat-pill .num{font-size:1.1rem}.stat-pill .lbl{font-size:.62rem}
+            .nav-tabs{gap:.15rem;padding:.35rem;margin-bottom:1.25rem;border-radius:var(--radius)}
+            .tab-btn{padding:.5rem .7rem;font-size:.78rem;border-radius:var(--radius)}
+            .toolbar{flex-direction:column;gap:.5rem;margin-bottom:1rem}
+            .search-wrap{min-width:100%;width:100%}
+            .toolbar .btn{width:100%;justify-content:center;padding:.7rem}
+            .toolbar .view-toggles{width:100%;display:flex;justify-content:center;gap:.5rem}
+            .filters-bar{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:1rem}
+            .filter-label{grid-column:1/-1;margin:0}
+            .filter-select{font-size:.82rem;padding:.45rem .5rem}
+            .sort-direction{width:100%;text-align:center}
+            .books-grid{grid-template-columns:1fr;gap:.75rem}
+            .books-grid.list-view .book-card{grid-template-columns:50px 1fr auto}
+            .books-grid.list-view .book-cover-area{height:65px;width:50px}
+            .book-cover-area{height:160px}
+            .book-card-inner{padding:1rem}
+            .book-title-text{font-size:1.05rem}
+            .book-meta{font-size:.75rem}
+            .book-actions-bar{gap:.35rem}
+            .book-actions-bar .btn{padding:.45rem .5rem;font-size:.78rem}
+            .modal-overlay{padding:0;align-items:flex-end}
+            .modal-box{max-width:100%;max-height:95vh;border-radius:var(--radius-lg) var(--radius-lg) 0 0;animation:modalSlideUp .3s ease}
+            @keyframes modalSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+            .modal-header{padding:1rem;position:sticky;top:0;background:var(--cream);z-index:5;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+            .modal-body{padding:1rem}
+            .form-grid{grid-template-columns:1fr;gap:.75rem}
+            .form-group.full{grid-column:1}
+            .isbn-lookup-row{flex-direction:column}.isbn-lookup-row .btn{width:100%}
+            .isbn-preview{flex-direction:column;align-items:center;text-align:center}
+            .isbn-preview img{width:70px}
+            .form-actions{flex-direction:column-reverse;gap:.5rem}
+            .form-actions .btn{width:100%;justify-content:center;padding:.7rem}
+            .detail-grid{grid-template-columns:1fr;text-align:center}
+            .detail-cover,.detail-cover-placeholder{max-width:140px;margin:0 auto}
+            .detail-info-grid{grid-template-columns:1fr 1fr}
+            .stats-overview{grid-template-columns:repeat(2,1fr);gap:.6rem}
+            .stat-card{padding:.75rem}.stat-card .value{font-size:1.4rem}.stat-card .icon{font-size:1.4rem;margin-bottom:.2rem}.stat-card .label{font-size:.65rem}
+            .charts-row{grid-template-columns:1fr;gap:1rem}
+            .chart-box{padding:.75rem}.chart-box h3{font-size:.95rem;margin-bottom:.6rem}
+            .chart-box canvas{max-height:220px}
+            .shelving-section{padding:.75rem}
+            .shelving-section h3{font-size:1.05rem}
+            .shelving-explanation{padding:.75rem;font-size:.82rem;line-height:1.6}
+            .shelf-row{flex-direction:column;margin-bottom:1rem}
+            .shelf-category-label{writing-mode:horizontal-tb;transform:none;padding:.5rem .75rem;min-width:unset;border-radius:var(--radius) var(--radius) 0 0;font-size:.72rem;text-align:center}
+            .shelf-scroll-wrap{border-radius:0 0 var(--radius) var(--radius)}
+            .shelf-books{padding:1.5rem .5rem .5rem;min-height:100px;gap:3px}
+            .shelf-book{width:26px;min-height:55px}
+            .shelf-book .spine-text{font-size:.48rem}
+            .suggestion-card{padding:1rem}
+            .suggestion-card h4{font-size:1rem}
+            .suggestion-neighbors{flex-direction:column;gap:.35rem}
+            .neighbor-arrow{transform:rotate(90deg)}
+            .neighbor-book{min-width:unset;width:100%}
+            .backup-grid{grid-template-columns:1fr 1fr;gap:.6rem}
+            .backup-card{padding:1rem}.backup-card .b-icon{font-size:1.5rem;margin-bottom:.25rem}.backup-card .b-title{font-size:.85rem}.backup-card .b-desc{font-size:.75rem}
+            .toast-container{bottom:.5rem;right:.5rem;left:.5rem}
+            .toast{max-width:100%;font-size:.82rem;padding:.6rem 1rem}
+            .back-to-top{bottom:.75rem;left:.75rem;width:40px;height:40px;font-size:1.1rem}
+            .confirm-box{max-width:100%;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+        }
+        @media(max-width:400px){
+            .container{padding:.4rem}header h1{font-size:1.15rem}
+            .header-stats{gap:.35rem}.stat-pill{padding:.2rem .45rem}.stat-pill .num{font-size:.95rem}.stat-pill .lbl{font-size:.58rem}
+            .nav-tabs{padding:.25rem}.tab-btn{padding:.4rem .55rem;font-size:.72rem}
+            .stats-overview{gap:.4rem}.stat-card{padding:.5rem}.stat-card .value{font-size:1.1rem}
+            .books-grid{gap:.5rem}.book-cover-area{height:120px}
+            .backup-grid{grid-template-columns:1fr}
+        }
+        @media(hover:none) and (pointer:coarse){
+            .btn{min-height:44px;padding:.7rem 1rem}
+            .btn-sm{min-height:38px;padding:.5rem .7rem}
+            .tab-btn{min-height:40px}
+            .filter-select{min-height:40px}
+            .sort-direction{min-height:40px;min-width:44px}
+            .shelf-book{width:32px;min-height:60px}
+            .btn-icon{width:44px;height:44px}
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           MOTIVI POETRIFY — adattamento editoriale (fase 2)
+           Tipografia Playfair/Source Serif/Source Sans/JetBrains,
+           etichette maiuscolette, segnatura mono, regole sottili,
+           barra-accento, pill. Riprende l'identità di Poetrify
+           adattandola agli scopi di una biblioteca personale.
+           ═══════════════════════════════════════════════════════════ */
+        h1,h2,h3,h4{letter-spacing:-.018em}
+        header h1{font-weight:700}
+        header h1 strong{letter-spacing:-.02em}
+        /* Testo "di lettura" in serif Source Serif 4 */
+        .book-author-text,.detail-author,.detail-notes,.shelving-explanation,
+        .neighbor-book strong,.confirm-msg,.isbn-preview-info p,.empty-state p,
+        .book-cover-placeholder,.detail-cover-placeholder{font-family:var(--font-body)}
+        .detail-notes,.shelving-explanation{font-style:italic}
+        /* Segnatura · ISBN · codici in monospace */
+        .book-location-badge,.auto-location-code,.shelf-tooltip .tt-loc,
+        .auto-location-preview,code{font-family:var(--font-mono);font-feature-settings:"tnum" 1;letter-spacing:0}
+        .book-location-badge{border-radius:4px;font-weight:600}
+        /* Etichette maiuscolette scholarly */
+        .filter-label,.stat-card .label,.stat-pill .lbl,.di-label,
+        .form-group label,.isbn-source,.tab-btn,.btn{font-family:var(--font-ui)}
+        .filter-label,.di-label,.form-group label{letter-spacing:.07em}
+        /* Badge come pill (motivo Poetrify) */
+        .badge{border-radius:99px;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:.05em;font-size:.65rem;font-weight:600;padding:.22rem .62rem}
+        /* Pulsanti */
+        .btn{letter-spacing:.015em}
+        .btn-primary{box-shadow:0 1px 2px rgba(162,46,55,.25)}
+        /* Card: regole sottili + hover editoriale (bordo accento, sollevamento, ombra tenue) */
+        .book-card:hover{border-color:var(--accent);box-shadow:0 12px 30px rgba(162,46,55,.10);transform:translateY(-3px)}
+        [data-theme="dark"] .book-card:hover{box-shadow:0 12px 30px rgba(0,0,0,.45)}
+        .backup-card:hover,.chart-box:hover{border-color:var(--accent)}
+        /* Stat card: barra-accento a sinistra + valore in display */
+        .stat-card{border-left:3px solid var(--accent);text-align:left}
+        .stat-card .icon{font-size:1.35rem;margin-bottom:.2rem}
+        .stat-card .value{font-family:var(--font-display);color:var(--accent)}
+        .stat-card .label{letter-spacing:.06em}
+        /* Pill statistiche nell'header */
+        .stat-pill{border-radius:99px}
+        .stat-pill .num{font-family:var(--font-display)}
+        .stat-pill .lbl{letter-spacing:.1em}
+        /* Nav tabs: stato attivo editoriale (testo accento + barra sotto) */
+        .nav-tabs{border:1px solid var(--parchment-dark)}
+        .tab-btn{letter-spacing:.03em}
+        .tab-btn.active{background:var(--accent-glow);color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+        /* Anello di focus accento sugli input */
+        .search-wrap input:focus,.form-group input:focus,.form-group select:focus,
+        .form-group textarea:focus,.filter-select:focus,.isbn-lookup-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+        /* Stelle valutazione in ocra antico */
+        .stars{color:var(--gold)}
+        /* Suggestion card: titolo in display, accento ocra */
+        .suggestion-card{border-color:var(--gold-light)}
+        .suggestion-card h4{font-family:var(--font-display);color:var(--accent)}
+        /* Esplorazione collocazione: bordo-accento a sinistra (motivo status-card Poetrify) */
+        .shelving-explanation{border-left-width:3px}
+        /* Modal: titolo display */
+        .modal-header h2,.detail-title,.confirm-title{font-family:var(--font-display)}
+    </style>
+</head>
+<body>
+<header>
+    <div class="container">
+        <div class="header-inner">
+            <h1><strong>Pinakes</strong> <span class="brand-sub">la mia biblioteca</span></h1>
+            <div class="header-controls">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Tema chiaro/scuro" aria-label="Cambia tema">&#9790;</button>
+            </div>
+        </div>
+        <div class="header-stats">
+            <div class="stat-pill"><span class="num" id="h-total">0</span><span class="lbl">Libri</span></div>
+            <div class="stat-pill"><span class="num" id="h-read">0</span><span class="lbl">Letti</span></div>
+            <div class="stat-pill"><span class="num" id="h-year">0</span><span class="lbl">Quest'anno</span></div>
+            <div class="stat-pill"><span class="num" id="h-reading">0</span><span class="lbl">In Corso</span></div>
+            <div class="stat-pill"><span class="num" id="h-pages">0</span><span class="lbl">Pagine</span></div>
+        </div>
+    </div>
+</header>
+<div class="container">
+    <nav class="nav-tabs" role="tablist">
+        <button class="tab-btn active" data-tab="catalog">Catalogo</button>
+        <button class="tab-btn" data-tab="shelving">Collocazione</button>
+        <button class="tab-btn" data-tab="stats">Statistiche</button>
+        <button class="tab-btn" data-tab="backup">Backup</button>
+    </nav>
+
+    <!-- CATALOG -->
+    <section id="panel-catalog" class="tab-panel active">
+        <div class="toolbar">
+            <div class="search-wrap">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="search-input" placeholder="Cerca titolo, autore, ISBN, genere…">
+            </div>
+            <button class="btn btn-primary" onclick="openAddModal()">+ Aggiungi</button>
+            <button class="btn btn-outline" onclick="openScannerModal()">&#9641; Scanner</button>
+            <div class="view-toggles" style="display:flex;gap:.25rem">
+                <button class="btn-icon active" id="view-grid-btn" onclick="setView('grid')" title="Griglia">&#9638;</button>
+                <button class="btn-icon" id="view-list-btn" onclick="setView('list')" title="Lista">&#9776;</button>
+            </div>
+        </div>
+        <div class="filters-bar">
+            <span class="filter-label">Filtra:</span>
+            <select class="filter-select" id="filter-status"><option value="">Tutti gli stati</option><option value="Letto">Letto</option><option value="In Corso">In Corso</option><option value="Da Leggere">Da Leggere</option><option value="Abbandonato">Abbandonato</option></select>
+            <select class="filter-select" id="filter-category"></select>
+            <select class="filter-select" id="filter-rating"><option value="">Valutazione</option><option value="5">★★★★★</option><option value="4">★★★★+</option><option value="3">★★★+</option></select>
+            <span class="filter-label" style="margin-left:.5rem">Ordina:</span>
+            <select class="filter-select" id="sort-field"><option value="dateAdded">Data aggiunta</option><option value="title">Titolo</option><option value="author">Autore</option><option value="year">Anno</option><option value="rating">Valutazione</option><option value="pages">Pagine</option></select>
+            <button class="sort-direction" id="sort-dir-btn" onclick="toggleSortDir()">&#8595;</button>
+        </div>
+        <div id="books-grid" class="books-grid"></div>
+    </section>
+
+    <!-- SHELVING -->
+    <section id="panel-shelving" class="tab-panel">
+        <div class="shelving-section">
+            <h3>Sistema di Collocazione Biblioteconomica</h3>
+            <div class="shelving-explanation">
+                I libri sono organizzati secondo un sistema ispirato alla <strong>Classificazione Decimale Dewey</strong>, adattato per una biblioteca personale.
+                La segnatura si compone di: <strong>codice categoria</strong> (3 lettere) + <strong>codice sottocategoria</strong> (2 cifre) + <strong>prime 3 lettere del cognome autore</strong> + <strong>posizione</strong> progressiva.
+            </div>
+            <div class="shelf-filter-bar">
+                <span class="filter-label">Stanza:</span>
+                <select class="filter-select" id="shelf-room-filter" onchange="renderShelving()">
+                    <option value="">Tutte le stanze</option>
+                    <option value="SA">Salotto</option>
+                    <option value="ST">Studio</option>
+                    <option value="CA">Camera</option>
+                    <option value="IN">Ingresso</option>
+                    <option value="AL">Altro</option>
+                </select>
+            </div>
+            <div id="shelving-visual"></div>
+        </div>
+        <div class="shelving-section">
+            <h3>Calcola Collocazione</h3>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+                <input type="text" id="shelf-suggest-title" placeholder="Titolo" class="filter-select" style="flex:1;min-width:150px">
+                <input type="text" id="shelf-suggest-author" placeholder="Autore" class="filter-select" style="flex:1;min-width:150px">
+                <select id="shelf-suggest-cat" class="filter-select" onchange="populateSubcatSelect('shelf-suggest-sub',this.value)"></select>
+                <select id="shelf-suggest-sub" class="filter-select"></select>
+                <button class="btn btn-primary" onclick="showShelfSuggestion()">Calcola</button>
+            </div>
+            <div id="shelf-suggestion-result"></div>
+        </div>
+    </section>
+
+    <!-- STATS -->
+    <section id="panel-stats" class="tab-panel">
+        <div class="stats-overview" id="stats-overview"></div>
+        <div class="charts-row">
+            <div class="chart-box"><h3>Per Categoria</h3><canvas id="chart-category"></canvas></div>
+            <div class="chart-box"><h3>Per Stato</h3><canvas id="chart-status"></canvas></div>
+            <div class="chart-box"><h3>Valutazioni</h3><canvas id="chart-ratings"></canvas></div>
+            <div class="chart-box"><h3>Pagine per Categoria</h3><canvas id="chart-pages"></canvas></div>
+            <div class="chart-box"><h3>Top Autori</h3><canvas id="chart-authors"></canvas></div>
+            <div class="chart-box"><h3>Per Formato</h3><canvas id="chart-format"></canvas></div>
+            <div class="chart-box" style="grid-column:1/-1"><h3>Libri Aggiunti nel Tempo</h3><canvas id="chart-timeline" style="max-height:200px"></canvas></div>
+        </div>
+    </section>
+
+    <!-- BACKUP -->
+    <section id="panel-backup" class="tab-panel">
+        <h2 style="margin-bottom:1.5rem">Backup e Esportazione</h2>
+        <div class="backup-grid">
+            <div class="backup-card" onclick="exportCSV(false)"><div class="b-icon">&#128196;</div><div class="b-title">Esporta CSV</div><div class="b-desc">Tutti i libri</div></div>
+            <div class="backup-card" onclick="exportCSV(true)"><div class="b-icon">&#128203;</div><div class="b-title">CSV Filtrati</div><div class="b-desc">Solo i libri visualizzati</div></div>
+            <div class="backup-card" onclick="exportJSON()"><div class="b-icon">&#128295;</div><div class="b-title">Backup JSON</div><div class="b-desc">Backup completo</div></div>
+            <div class="backup-card" onclick="exportMarkdown()"><div class="b-icon">&#128221;</div><div class="b-title">Lista Markdown</div><div class="b-desc">Lista di lettura condivisibile</div></div>
+            <div class="backup-card" onclick="window.print()"><div class="b-icon">&#128424;</div><div class="b-title">Stampa</div><div class="b-desc">Versione stampabile</div></div>
+            <div class="backup-card" onclick="importData()"><div class="b-icon">&#128229;</div><div class="b-title">Importa</div><div class="b-desc">Carica o unisci backup</div></div>
+        </div>
+    </section>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modal-book">
+<div class="modal-box">
+    <div class="modal-header"><h2 id="modal-book-title">Aggiungi Libro</h2><button class="modal-close" onclick="closeModal('modal-book')">&times;</button></div>
+    <div class="modal-body">
+        <div style="margin-bottom:1.25rem">
+            <label style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);display:block;margin-bottom:.35rem">Cerca tramite ISBN</label>
+            <div class="isbn-lookup-row">
+                <input type="text" id="isbn-lookup" placeholder="ISBN-10 o ISBN-13">
+                <button class="btn btn-primary" onclick="lookupISBN()" id="isbn-lookup-btn">Cerca</button>
+            </div>
+            <div class="isbn-preview" id="isbn-preview"></div>
+        </div>
+        <form id="book-form" onsubmit="saveBook(event)">
+            <div class="form-grid">
+                <div class="form-group"><label>Titolo *</label><input type="text" id="f-title" required></div>
+                <div class="form-group"><label>Autore *</label><input type="text" id="f-author" required></div>
+                <div class="form-group"><label>ISBN</label><input type="text" id="f-isbn"></div>
+                <div class="form-group"><label>Editore</label><input type="text" id="f-publisher"></div>
+                <div class="form-group"><label>Anno</label><input type="number" id="f-year" min="1000" max="2100"></div>
+                <div class="form-group"><label>Pagine</label><input type="number" id="f-pages" min="1"></div>
+                <div class="form-group"><label>Lingua</label><select id="f-language"><option value="it">Italiano</option><option value="en">Inglese</option><option value="fr">Francese</option><option value="de">Tedesco</option><option value="es">Spagnolo</option><option value="la">Latino</option><option value="grc">Greco antico</option><option value="other">Altra</option></select></div>
+                <div class="form-group"><label>Categoria *</label><select id="f-category" onchange="onCategoryChange()"></select></div>
+                <div class="form-group"><label>Sottocategoria</label><select id="f-subcategory"></select></div>
+                <div class="form-group"><label>Genere specifico</label><input type="text" id="f-genre" placeholder="es. Giallo, Biografia…"></div>
+                <div class="form-group"><label>Formato</label><select id="f-format"><option>Rilegato</option><option>Brossura</option><option>Tascabile</option><option>eBook</option><option>Audiolibro</option></select></div>
+                <div class="form-group"><label>Stanza</label><select id="f-room"><option value="SA">Salotto</option><option value="ST">Studio</option><option value="CA">Camera</option><option value="IN">Ingresso</option><option value="AL">Altro</option></select></div>
+                <div class="form-group"><label>Scaffale</label><input type="number" id="f-shelf" min="1" max="99" value="1" style="width:80px"></div>
+                <div class="form-group"><label>Prezzo (&#8364;)</label><input type="number" id="f-price" step="0.01" min="0"></div>
+                <div class="form-group"><label>Stato</label><select id="f-status" onchange="onStatusChange()"><option>Da Leggere</option><option>In Corso</option><option>Letto</option><option>Abbandonato</option></select></div>
+                <div class="form-group"><label>Valutazione</label><select id="f-rating"><option value="0">&#8212;</option><option value="1">★</option><option value="2">★★</option><option value="3">★★★</option><option value="4">★★★★</option><option value="5">★★★★★</option></select></div>
+                <div class="form-group"><label>Inizio lettura</label><input type="date" id="f-started"></div>
+                <div class="form-group"><label>Fine lettura</label><input type="date" id="f-finished"></div>
+                <div class="form-group"><label>URL Copertina</label><input type="url" id="f-cover" placeholder="https://…"></div>
+                <div class="form-group full">
+                    <label>Ubicazione Automatica</label>
+                    <div class="auto-location-box show" id="auto-location-box">
+                        Segnatura: <strong id="auto-location-preview">—</strong>
+                    </div>
+                </div>
+                <div class="form-group full"><label>Note</label><textarea id="f-notes"></textarea></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modal-book')">Annulla</button>
+                <button type="submit" class="btn btn-primary" id="save-book-btn">Salva</button>
+            </div>
+        </form>
+    </div>
+</div></div>
+
+<!-- #2 DETAIL MODAL -->
+<div class="modal-overlay" id="modal-detail">
+<div class="modal-box" style="max-width:680px">
+    <div class="modal-header"><h2>Dettaglio Libro</h2><button class="modal-close" onclick="closeModal('modal-detail')">&times;</button></div>
+    <div class="modal-body" id="detail-body"></div>
+</div></div>
+
+<!-- SCANNER MODAL -->
+<div class="modal-overlay" id="modal-scanner">
+<div class="modal-box" style="max-width:540px">
+    <div class="modal-header"><h2>Scansiona Codice a Barre</h2><button class="modal-close" onclick="closeScannerModal()">&times;</button></div>
+    <div class="modal-body">
+        <div class="scanner-area">
+            <div id="scanner-viewport"><div class="scanner-guide"></div></div>
+            <p id="scanner-status" style="font-size:.9rem;color:var(--ink-muted);margin-top:.5rem">Verifica fotocamera…</p>
+            <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="closeScannerModal();manualISBNEntry()">Inserisci manualmente</button>
+                <button class="btn btn-outline" onclick="closeScannerModal()">Annulla</button>
+            </div>
+        </div>
+    </div>
+</div></div>
+
+<!-- #3 CUSTOM CONFIRM -->
+<div class="modal-overlay" id="modal-confirm">
+<div class="modal-box confirm-box">
+    <div class="modal-body">
+        <div class="confirm-icon" id="confirm-icon">&#128218;</div>
+        <div class="confirm-title" id="confirm-title"></div>
+        <div class="confirm-msg" id="confirm-msg"></div>
+        <div class="confirm-actions">
+            <button class="btn btn-outline" onclick="resolveConfirm(false)">Annulla</button>
+            <button class="btn btn-danger" id="confirm-action-btn" onclick="resolveConfirm(true)">Elimina</button>
+        </div>
+    </div>
+</div></div>
+
+<div class="toast-container" id="toast-container"></div>
+<button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Torna su">&#8679;</button>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  TAXONOMY
+// ════════════════════════════════════════════════════════════════
+const TAXONOMY = {
+    "NAR":{name:"Narrativa",color:"#8b4513",subs:{"01":"Romanzo letterario","02":"Romanzo storico","03":"Giallo / Thriller","04":"Fantascienza","05":"Fantasy","06":"Horror","07":"Avventura","08":"Rosa / Sentimentale","09":"Umorismo / Satira","10":"Realismo magico","11":"Distopia","12":"Narrativa per ragazzi","13":"Racconti / Novelle","99":"Altra narrativa"}},
+    "POE":{name:"Poesia",color:"#6a0572",subs:{"01":"Poesia lirica","02":"Poesia epica","03":"Poesia contemporanea","04":"Poesia dialettale","05":"Antologie poetiche","06":"Poesia classica (lat/gr)","99":"Altra poesia"}},
+    "TEA":{name:"Teatro e Drammaturgia",color:"#b5651d",subs:{"01":"Tragedia","02":"Commedia","03":"Dramma moderno","04":"Teatro dell'assurdo","05":"Libretti d'opera","06":"Teatro classico (lat/gr)","99":"Altro teatro"}},
+    "SAG":{name:"Saggistica",color:"#2c5f2d",subs:{"01":"Filosofia","02":"Psicologia","03":"Sociologia","04":"Politica","05":"Economia","06":"Antropologia","07":"Linguistica","08":"Critica letteraria","09":"Critica d'arte","10":"Scienza divulgativa","11":"Attualità / Reportage","99":"Altra saggistica"}},
+    "STO":{name:"Storia e Geografia",color:"#1d3557",subs:{"01":"Storia antica","02":"Storia medievale","03":"Storia moderna","04":"Storia contemporanea","05":"Storia d'Italia","06":"Storia mondiale","07":"Biografia / Autobiografia","08":"Memorialistica","09":"Geografia e viaggi","99":"Altra storia"}},
+    "ART":{name:"Arte e Musica",color:"#c2185b",subs:{"01":"Storia dell'arte","02":"Architettura","03":"Fotografia","04":"Cinema","05":"Musica classica","06":"Musica moderna","07":"Design e grafica","08":"Arti visive","99":"Altra arte"}},
+    "SCI":{name:"Scienze e Tecnologia",color:"#00695c",subs:{"01":"Matematica","02":"Fisica","03":"Chimica","04":"Biologia","05":"Medicina e salute","06":"Informatica","07":"Ingegneria","08":"Astronomia","09":"Scienze della Terra","10":"Ecologia e ambiente","99":"Altra scienza"}},
+    "MAN":{name:"Manualistica e Didattica",color:"#4527a0",subs:{"01":"Manuali scolastici","02":"Grammatiche e dizionari","03":"Guide pratiche","04":"Manuali tecnici","05":"Cucina e gastronomia","06":"Giardinaggio","07":"Fai da te","08":"Sport e fitness","99":"Altra manualistica"}},
+    "REL":{name:"Religione e Spiritualità",color:"#5d4037",subs:{"01":"Testi sacri","02":"Teologia","03":"Filosofia orientale","04":"Spiritualità","05":"Mistica","06":"Mitologia","99":"Altra religione"}},
+    "DIR":{name:"Diritto e Giurisprudenza",color:"#37474f",subs:{"01":"Diritto civile","02":"Diritto penale","03":"Diritto costituzionale","04":"Diritto internazionale","05":"Codici e raccolte","99":"Altro diritto"}},
+    "FUM":{name:"Fumetti e Graphic Novel",color:"#e65100",subs:{"01":"Supereroi","02":"Manga","03":"Graphic novel","04":"Fumetto d'autore","05":"Fumetto umoristico","06":"BD / Fumetto europeo","99":"Altro fumetto"}},
+    "VAR":{name:"Varia",color:"#78909c",subs:{"01":"Enciclopedie","02":"Almanacchi","03":"Riviste e periodici","04":"Giochi e enigmistica","99":"Altro"}}
+};
+const CAT_CODES = Object.keys(TAXONOMY);
+const SPINE_COLORS = ['#8b4513','#2c5f2d','#1d3557','#6a0572','#b5651d','#c2185b','#264653','#9c4dcc','#e76f51','#2a9d8f','#6d4c41','#5c6bc0','#ef6c00','#00695c','#ad1457','#4527a0','#c62828','#00838f'];
+const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Spagnolo',la:'Latino',grc:'Greco antico',other:'Altra'};
+
+// ════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════
+let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
+let confirmResolver = null;
+const STORAGE_KEY = 'biblioteca_books_v4';
+
+// ════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    loadFromStorage(); buildCategorySelects(); setupTabs(); setupFilters(); renderCatalog(); updateHeaderStats(); checkEnvironment(); initBackToTop(); initTheme();
+});
+
+function loadFromStorage(){ try{books=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{books=[]} if(!books.length) loadSampleBooks(); }
+function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(books)); }
+
+function loadSampleBooks(){
+    const now = new Date().toISOString();
+    books = [
+        {id:1,title:"Il Nome della Rosa",author:"Umberto Eco",isbn:"9788845296390",publisher:"Bompiani",year:1980,pages:624,category:"NAR",subcategory:"02",genre:"Romanzo Storico",format:"Rilegato",language:"it",room:"SA",shelfNum:1,price:22,status:"Letto",rating:5,notes:"Capolavoro assoluto.",cover:"https://covers.openlibrary.org/b/isbn/9788845296390-M.jpg",dateAdded:"2024-01-15T10:00:00Z",startedDate:"2024-01-20",finishedDate:"2024-02-10"},
+        {id:2,title:"1984",author:"George Orwell",isbn:"9788804668237",publisher:"Mondadori",year:1949,pages:333,category:"NAR",subcategory:"11",genre:"Distopia",format:"Brossura",language:"it",room:"SA",shelfNum:1,price:12,status:"Letto",rating:5,notes:"",cover:"https://covers.openlibrary.org/b/isbn/9788804668237-M.jpg",dateAdded:"2024-02-20T10:00:00Z",startedDate:"2024-03-01",finishedDate:"2024-03-15"},
+        {id:3,title:"La Divina Commedia",author:"Dante Alighieri",isbn:"",publisher:"Einaudi",year:1321,pages:798,category:"POE",subcategory:"02",genre:"Poema epico",format:"Rilegato",language:"it",room:"ST",shelfNum:1,price:35,status:"Letto",rating:5,notes:"",cover:"",dateAdded:"2024-03-10T10:00:00Z",startedDate:"2024-04-01",finishedDate:"2024-06-15"},
+        {id:4,title:"Sapiens",author:"Yuval Noah Harari",isbn:"9788845296000",publisher:"Bompiani",year:2014,pages:510,category:"STO",subcategory:"06",genre:"Storia mondiale",format:"Brossura",language:"it",room:"SA",shelfNum:2,price:18,status:"Letto",rating:4,notes:"",cover:"",dateAdded:"2024-04-05T10:00:00Z",startedDate:"2024-05-01",finishedDate:"2024-06-01"},
+        {id:5,title:"Il Piccolo Principe",author:"Antoine de Saint-Exupéry",isbn:"9788845292613",publisher:"Bompiani",year:1943,pages:98,category:"NAR",subcategory:"12",genre:"Fiaba",format:"Tascabile",language:"it",room:"SA",shelfNum:1,price:8,status:"Letto",rating:5,notes:"",cover:"https://covers.openlibrary.org/b/isbn/9788845292613-M.jpg",dateAdded:"2024-05-01T10:00:00Z",startedDate:"2024-05-02",finishedDate:"2024-05-03"},
+        {id:6,title:"Cento anni di solitudine",author:"Gabriel García Márquez",isbn:"",publisher:"Feltrinelli",year:1967,pages:448,category:"NAR",subcategory:"10",genre:"Realismo magico",format:"Brossura",language:"it",room:"SA",shelfNum:1,price:14,status:"In Corso",rating:0,notes:"",cover:"",dateAdded:"2025-01-10T10:00:00Z",startedDate:"2025-01-15",finishedDate:""},
+        {id:7,title:"Sei personaggi in cerca d'autore",author:"Luigi Pirandello",isbn:"",publisher:"Mondadori",year:1921,pages:160,category:"TEA",subcategory:"03",genre:"Dramma",format:"Tascabile",language:"it",room:"ST",shelfNum:1,price:10,status:"Da Leggere",rating:0,notes:"",cover:"",dateAdded:"2025-02-01T10:00:00Z",startedDate:"",finishedDate:""},
+        {id:8,title:"Breve storia di quasi tutto",author:"Bill Bryson",isbn:"",publisher:"TEA",year:2003,pages:590,category:"SCI",subcategory:"10",genre:"Divulgazione",format:"Brossura",language:"en",room:"ST",shelfNum:2,price:15,status:"Letto",rating:4,notes:"",cover:"",dateAdded:"2024-07-20T10:00:00Z",startedDate:"2024-08-01",finishedDate:"2024-09-20"},
+    ];
+    persist();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  #19 DARK MODE
+// ════════════════════════════════════════════════════════════════
+function initTheme(){ const t=localStorage.getItem('biblio-theme')||'light'; document.documentElement.dataset.theme=t; updateThemeIcon(); }
+function toggleTheme(){ const n=document.documentElement.dataset.theme==='light'?'dark':'light'; document.documentElement.dataset.theme=n; localStorage.setItem('biblio-theme',n); updateThemeIcon(); }
+function updateThemeIcon(){ document.querySelector('.theme-toggle').textContent=document.documentElement.dataset.theme==='dark'?'☀':'☽'; }
+
+// ════════════════════════════════════════════════════════════════
+//  #20 BACK TO TOP
+// ════════════════════════════════════════════════════════════════
+function initBackToTop(){ window.addEventListener('scroll',()=>{ document.getElementById('back-to-top').classList.toggle('visible',window.scrollY>400); },{passive:true}); }
+
+// ════════════════════════════════════════════════════════════════
+//  CATEGORY SELECTS
+// ════════════════════════════════════════════════════════════════
+function buildCategorySelects(){
+    const opts='<option value="">Seleziona…</option>'+CAT_CODES.map(c=>`<option value="${c}">${TAXONOMY[c].name}</option>`).join('');
+    document.getElementById('f-category').innerHTML=opts;
+    document.getElementById('shelf-suggest-cat').innerHTML=opts;
+    populateFilterCategories();
+}
+function populateSubcatSelect(selectId,catCode){
+    const sel=document.getElementById(selectId);
+    if(!catCode||!TAXONOMY[catCode]){sel.innerHTML='<option value="">—</option>';return}
+    sel.innerHTML='<option value="">Generale</option>'+Object.entries(TAXONOMY[catCode].subs).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+}
+function onCategoryChange(){ populateSubcatSelect('f-subcategory',document.getElementById('f-category').value); updateAutoLocation(); }
+function populateFilterCategories(){ document.getElementById('filter-category').innerHTML='<option value="">Tutte le categorie</option>'+CAT_CODES.map(c=>`<option value="${c}">${TAXONOMY[c].name}</option>`).join(''); }
+
+// ════════════════════════════════════════════════════════════════
+//  AUTO-LOCATION
+// ════════════════════════════════════════════════════════════════
+function generateLocation(book){
+    const cat=book.category||'VAR',sub=book.subcategory||'99';
+    const surname=getAuthorSurname(book.author).substring(0,3).toUpperCase().padEnd(3,'_');
+    return `${cat}.${sub}.${surname}/${book.room||'SA'}.${String(book.shelfNum||1).padStart(2,'0')}`;
+}
+function updateAutoLocation(){
+    const cat=val('f-category'),sub=val('f-subcategory')||'99',author=val('f-author'),room=val('f-room'),shelf=val('f-shelf')||'1';
+    if(!cat||!author){document.getElementById('auto-location-preview').textContent='—';return}
+    const surname=getAuthorSurname(author).substring(0,3).toUpperCase().padEnd(3,'_');
+    document.getElementById('auto-location-preview').textContent=`${cat}.${sub}.${surname}/${room}.${String(shelf).padStart(2,'0')}`;
+}
+['f-author','f-shelf'].forEach(id=>{document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updateAutoLocation)})});
+document.addEventListener('DOMContentLoaded',()=>{['f-category','f-subcategory','f-room'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('change',updateAutoLocation)})});
+function getCatName(code){return TAXONOMY[code]?.name||code||'—'}
+function getSubName(cat,sub){return TAXONOMY[cat]?.subs?.[sub]||''}
+
+// ════════════════════════════════════════════════════════════════
+//  #5 STATUS CHANGE → AUTO DATE
+// ════════════════════════════════════════════════════════════════
+function onStatusChange(){
+    const st=document.getElementById('f-status').value;
+    const today=new Date().toISOString().slice(0,10);
+    if(st==='In Corso'&&!document.getElementById('f-started').value) document.getElementById('f-started').value=today;
+    if(st==='Letto'&&!document.getElementById('f-finished').value) document.getElementById('f-finished').value=today;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  #1 VIEW TOGGLE
+// ════════════════════════════════════════════════════════════════
+function setView(mode){
+    viewMode=mode;
+    document.getElementById('books-grid').classList.toggle('list-view',mode==='list');
+    document.getElementById('view-grid-btn').classList.toggle('active',mode==='grid');
+    document.getElementById('view-list-btn').classList.toggle('active',mode==='list');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════════════
+function setupTabs(){
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+            if(btn.dataset.tab==='stats') renderStats();
+            if(btn.dataset.tab==='shelving') renderShelving();
+        });
+    });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FILTERS & SORT
+// ════════════════════════════════════════════════════════════════
+function setupFilters(){
+    ['search-input','filter-status','filter-category','filter-rating','sort-field'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.addEventListener('input',debounce(renderCatalog,200));
+        el.addEventListener('change',renderCatalog);
+    });
+}
+function toggleSortDir(){sortDir=sortDir==='desc'?'asc':'desc';document.getElementById('sort-dir-btn').textContent=sortDir==='desc'?'↓':'↑';renderCatalog()}
+
+function getFilteredBooks(){
+    const q=document.getElementById('search-input').value.toLowerCase().trim();
+    const st=document.getElementById('filter-status').value;
+    const cat=document.getElementById('filter-category').value;
+    const mr=parseInt(document.getElementById('filter-rating').value)||0;
+    const field=document.getElementById('sort-field').value;
+    let f=books.filter(b=>{
+        if(q&&!(b.title.toLowerCase().includes(q)||b.author.toLowerCase().includes(q)||(b.isbn||'').includes(q)||(b.genre||'').toLowerCase().includes(q)||(b.publisher||'').toLowerCase().includes(q)||getCatName(b.category).toLowerCase().includes(q)||(LANG_NAMES[b.language]||'').toLowerCase().includes(q))) return false;
+        if(st&&b.status!==st) return false;
+        if(cat&&b.category!==cat) return false;
+        if(mr&&(b.rating||0)<mr) return false;
+        return true;
+    });
+    f.sort((a,b)=>{let va,vb;switch(field){case'title':va=a.title.toLowerCase();vb=b.title.toLowerCase();return va<vb?-1:va>vb?1:0;case'author':va=a.author.toLowerCase();vb=b.author.toLowerCase();return va<vb?-1:va>vb?1:0;case'year':return(a.year||0)-(b.year||0);case'rating':return(a.rating||0)-(b.rating||0);case'pages':return(a.pages||0)-(b.pages||0);default:return new Date(a.dateAdded||0)-new Date(b.dateAdded||0)}});
+    if(sortDir==='desc') f.reverse();
+    return f;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  CATALOG RENDER
+// ════════════════════════════════════════════════════════════════
+function renderCatalog(){
+    const grid=document.getElementById('books-grid');
+    grid.classList.toggle('list-view',viewMode==='list');
+    const filtered=getFilteredBooks();
+    if(!filtered.length){grid.innerHTML='<div class="empty-state"><div class="e-icon">&#128218;</div><p>Nessun libro trovato.</p></div>';return}
+    grid.innerHTML=filtered.map(b=>{
+        const sc=b.status.toLowerCase().replace(/ /g,'-');
+        const stars=Array.from({length:5},(_,i)=>`<span class="${i<(b.rating||0)?'':'empty'}">★</span>`).join('');
+        const coverHtml=b.cover?`<img src="${esc(b.cover)}" alt="${esc(b.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=book-cover-placeholder>${esc(b.title)}</div>'">`:`<div class="book-cover-placeholder">${esc(b.title)}</div>`;
+        const loc=generateLocation(b);
+        const catLabel=getCatName(b.category);
+        const subLabel=getSubName(b.category,b.subcategory);
+        const hl=lastSavedId===b.id?' just-saved':'';
+        return `<div class="book-card${hl}" data-id="${b.id}" onclick="showDetail(${b.id})"><div class="book-cover-area">${coverHtml}</div><div class="book-card-inner">
+            <span class="badge badge-${sc}">${b.status}</span>
+            <div class="book-title-text">${esc(b.title)}</div>
+            <div class="book-author-text">${esc(b.author)}</div>
+            <div class="stars">${stars}</div>
+            <div class="book-meta">
+                ${catLabel?`<span>&#128278; ${esc(catLabel)}${subLabel?' — '+esc(subLabel):''}</span>`:''}
+                ${b.publisher?`<span>&#128214; ${esc(b.publisher)}</span>`:''}
+                ${b.year?`<span>&#128197; ${b.year}</span>`:''}
+                ${b.pages?`<span>&#128196; ${b.pages}p</span>`:''}
+                ${b.language?`<span>&#127760; ${LANG_NAMES[b.language]||b.language}</span>`:''}
+            </div>
+            <div class="book-location-badge" title="Segnatura">${esc(loc)}</div>
+            <div class="book-actions-bar" onclick="event.stopPropagation()">
+                <button class="btn btn-sm btn-outline" onclick="editBook(${b.id})">Modifica</button>
+                <button class="btn btn-sm btn-danger" onclick="requestDelete(${b.id})">Elimina</button>
+            </div></div></div>`;
+    }).join('');
+    if(lastSavedId){setTimeout(()=>{lastSavedId=null},2100)}
+}
+
+function updateHeaderStats(){
+    document.getElementById('h-total').textContent=books.length;
+    document.getElementById('h-read').textContent=books.filter(b=>b.status==='Letto').length;
+    document.getElementById('h-reading').textContent=books.filter(b=>b.status==='In Corso').length;
+    document.getElementById('h-pages').textContent=books.reduce((s,b)=>s+(b.pages||0),0).toLocaleString('it');
+    // #6 Books read this year
+    const yr=new Date().getFullYear();
+    const readThisYear=books.filter(b=>b.status==='Letto'&&b.finishedDate&&new Date(b.finishedDate).getFullYear()===yr).length;
+    document.getElementById('h-year').textContent=readThisYear;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  #2 DETAIL MODAL
+// ════════════════════════════════════════════════════════════════
+function showDetail(id){
+    const b=books.find(x=>x.id===id); if(!b)return;
+    const stars=Array.from({length:5},(_,i)=>`<span class="${i<(b.rating||0)?'':'empty'}">★</span>`).join('');
+    const loc=generateLocation(b);
+    const coverHtml=b.cover?`<img src="${esc(b.cover)}" class="detail-cover" alt="${esc(b.title)}" onerror="this.outerHTML='<div class=detail-cover-placeholder>${esc(b.title)}</div>'">`:`<div class="detail-cover-placeholder">${esc(b.title)}</div>`;
+    document.getElementById('detail-body').innerHTML=`
+        <div class="detail-grid">
+            <div>${coverHtml}</div>
+            <div>
+                <div class="detail-title">${esc(b.title)}</div>
+                <div class="detail-author">${esc(b.author)}</div>
+                <span class="badge badge-${b.status.toLowerCase().replace(/ /g,'-')}">${b.status}</span>
+                <span class="stars" style="margin-left:.5rem">${stars}</span>
+                <div class="detail-info-grid">
+                    ${b.publisher?`<div class="detail-info-item"><span class="di-label">Editore</span>${esc(b.publisher)}</div>`:''}
+                    ${b.year?`<div class="detail-info-item"><span class="di-label">Anno</span>${b.year}</div>`:''}
+                    ${b.pages?`<div class="detail-info-item"><span class="di-label">Pagine</span>${b.pages}</div>`:''}
+                    ${b.isbn?`<div class="detail-info-item"><span class="di-label">ISBN</span>${esc(b.isbn)}</div>`:''}
+                    ${b.language?`<div class="detail-info-item"><span class="di-label">Lingua</span>${LANG_NAMES[b.language]||b.language}</div>`:''}
+                    ${b.format?`<div class="detail-info-item"><span class="di-label">Formato</span>${esc(b.format)}</div>`:''}
+                    <div class="detail-info-item"><span class="di-label">Categoria</span>${getCatName(b.category)}${getSubName(b.category,b.subcategory)?' — '+getSubName(b.category,b.subcategory):''}</div>
+                    <div class="detail-info-item"><span class="di-label">Segnatura</span><code style="color:var(--accent);font-weight:600">${esc(loc)}</code></div>
+                    ${b.price?`<div class="detail-info-item"><span class="di-label">Prezzo</span>€${Number(b.price).toFixed(2)}</div>`:''}
+                    ${b.startedDate?`<div class="detail-info-item"><span class="di-label">Inizio</span>${b.startedDate}</div>`:''}
+                    ${b.finishedDate?`<div class="detail-info-item"><span class="di-label">Fine</span>${b.finishedDate}</div>`:''}
+                    ${b.startedDate&&b.finishedDate?`<div class="detail-info-item"><span class="di-label">Giorni</span>${Math.ceil((new Date(b.finishedDate)-new Date(b.startedDate))/(1000*60*60*24))}</div>`:''}
+                </div>
+                ${b.notes?`<div class="detail-notes">${esc(b.notes)}</div>`:''}
+                <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap">
+                    <button class="btn btn-primary btn-sm" onclick="closeModal('modal-detail');editBook(${b.id})">Modifica</button>
+                    <button class="btn btn-danger btn-sm" onclick="closeModal('modal-detail');requestDelete(${b.id})">Elimina</button>
+                </div>
+            </div>
+        </div>`;
+    openModal('modal-detail');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  #3 CUSTOM CONFIRM
+// ════════════════════════════════════════════════════════════════
+function customConfirm(title,msg,actionLabel='Elimina'){
+    return new Promise(resolve=>{
+        confirmResolver=resolve;
+        document.getElementById('confirm-title').textContent=title;
+        document.getElementById('confirm-msg').textContent=msg;
+        document.getElementById('confirm-action-btn').textContent=actionLabel;
+        openModal('modal-confirm');
+    });
+}
+function resolveConfirm(result){
+    closeModal('modal-confirm');
+    if(confirmResolver){confirmResolver(result);confirmResolver=null}
+}
+async function requestDelete(id){
+    const b=books.find(x=>x.id===id); if(!b)return;
+    const yes=await customConfirm('Eliminare questo libro?',`"${b.title}" di ${b.author} verrà rimosso dalla biblioteca.`);
+    if(yes){books=books.filter(x=>x.id!==id);persist();renderCatalog();updateHeaderStats();toast('Eliminato','info')}
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ADD / EDIT / SAVE
+// ════════════════════════════════════════════════════════════════
+function openAddModal(){
+    editingId=null;document.getElementById('book-form').reset();
+    document.getElementById('isbn-lookup').value='';
+    document.getElementById('isbn-preview').classList.remove('show');
+    document.getElementById('isbn-preview').innerHTML='';
+    document.getElementById('modal-book-title').textContent='Aggiungi Libro';
+    document.getElementById('save-book-btn').textContent='Salva';
+    populateSubcatSelect('f-subcategory','');
+    document.getElementById('auto-location-preview').textContent='—';
+    openModal('modal-book');
+}
+function editBook(id){
+    const b=books.find(x=>x.id===id);if(!b)return;
+    editingId=id;
+    document.getElementById('modal-book-title').textContent='Modifica';
+    document.getElementById('save-book-btn').textContent='Aggiorna';
+    document.getElementById('f-title').value=b.title||'';
+    document.getElementById('f-author').value=b.author||'';
+    document.getElementById('f-isbn').value=b.isbn||'';
+    document.getElementById('f-publisher').value=b.publisher||'';
+    document.getElementById('f-year').value=b.year||'';
+    document.getElementById('f-pages').value=b.pages||'';
+    document.getElementById('f-language').value=b.language||'it';
+    document.getElementById('f-category').value=b.category||'';
+    populateSubcatSelect('f-subcategory',b.category);
+    document.getElementById('f-subcategory').value=b.subcategory||'';
+    document.getElementById('f-genre').value=b.genre||'';
+    document.getElementById('f-format').value=b.format||'Rilegato';
+    document.getElementById('f-room').value=b.room||'SA';
+    document.getElementById('f-shelf').value=b.shelfNum||1;
+    document.getElementById('f-price').value=b.price||'';
+    document.getElementById('f-status').value=b.status||'Da Leggere';
+    document.getElementById('f-rating').value=b.rating||0;
+    document.getElementById('f-cover').value=b.cover||'';
+    document.getElementById('f-notes').value=b.notes||'';
+    document.getElementById('f-started').value=b.startedDate||'';
+    document.getElementById('f-finished').value=b.finishedDate||'';
+    document.getElementById('isbn-preview').classList.remove('show');
+    updateAutoLocation();
+    openModal('modal-book');
+}
+function saveBook(e){
+    e.preventDefault();
+    const data={
+        id:editingId||Date.now(),title:val('f-title'),author:val('f-author'),isbn:val('f-isbn'),
+        publisher:val('f-publisher'),year:parseInt(val('f-year'))||null,pages:parseInt(val('f-pages'))||null,
+        language:val('f-language')||'it',
+        category:val('f-category'),subcategory:val('f-subcategory'),genre:val('f-genre'),format:val('f-format'),
+        room:val('f-room'),shelfNum:parseInt(val('f-shelf'))||1,
+        price:parseFloat(val('f-price'))||0,status:val('f-status'),rating:parseInt(val('f-rating'))||0,
+        cover:val('f-cover'),notes:val('f-notes'),
+        startedDate:val('f-started'),finishedDate:val('f-finished'),
+        dateAdded:editingId?(books.find(b=>b.id===editingId)||{}).dateAdded||new Date().toISOString():new Date().toISOString()
+    };
+    // #4 Duplicate ISBN check
+    if(data.isbn&&!editingId){
+        const dup=books.find(b=>b.isbn===data.isbn);
+        if(dup){toast(`ISBN già presente: "${dup.title}"`,'error');return}
+    }
+    lastSavedId=data.id;
+    if(editingId){const i=books.findIndex(b=>b.id===editingId);if(i>=0)books[i]=data;toast('Libro aggiornato','success')}
+    else{books.push(data);toast('Libro aggiunto','success')}
+    persist();renderCatalog();updateHeaderStats();closeModal('modal-book');
+    // #21 Scroll to the saved card
+    setTimeout(()=>{const card=document.querySelector(`.book-card[data-id="${data.id}"]`);if(card)card.scrollIntoView({behavior:'smooth',block:'center'})},100);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  #8 ISBN VALIDATION (checksum)
+// ════════════════════════════════════════════════════════════════
+function isValidISBN(isbn){
+    if(isbn.length===13){let s=0;for(let i=0;i<13;i++)s+=parseInt(isbn[i])*(i%2===0?1:3);return s%10===0}
+    if(isbn.length===10){let s=0;for(let i=0;i<10;i++){const c=isbn[i]==='X'?10:parseInt(isbn[i]);if(isNaN(c)&&i<9)return false;s+=c*(10-i)}return s%11===0}
+    return false;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ISBN MULTI-DATABASE LOOKUP
+// ════════════════════════════════════════════════════════════════
+function fetchT(url,ms=12000){return Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r(new Error('TIMEOUT')),ms))])}
+function isRestricted(){try{if(self!==top){try{top.location.href}catch{return true}}}catch{return true}return false}
+function getBestCover(isbn,olCoverId,googleThumb){
+    const c=[];
+    if(googleThumb)c.push(googleThumb.replace('zoom=1','zoom=2').replace('&edge=curl',''));
+    if(olCoverId)c.push(`https://covers.openlibrary.org/b/id/${olCoverId}-L.jpg`);
+    if(isbn)c.push(`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`);
+    return c[0]||'';
+}
+function mapGoogleCategory(cats){
+    if(!cats||!cats.length)return{category:'',subcategory:''};
+    const c=cats[0].toLowerCase();
+    const map=[[/fiction|novel|literary/,'NAR','01'],[/thriller|mystery|crime|detective/,'NAR','03'],[/science fiction/,'NAR','04'],[/fantasy/,'NAR','05'],[/horror/,'NAR','06'],[/romance/,'NAR','08'],[/humor|comedy|satire/,'NAR','09'],[/juvenile|young adult|children/,'NAR','12'],[/poetry|poems|verse/,'POE','01'],[/drama|play|theatre|theater/,'TEA','03'],[/history/,'STO','06'],[/biography|autobiography|memoir/,'STO','07'],[/philosophy/,'SAG','01'],[/psychology/,'SAG','02'],[/social science|sociology/,'SAG','03'],[/politic/,'SAG','04'],[/econom/,'SAG','05'],[/art|painting|sculpture/,'ART','01'],[/architecture/,'ART','02'],[/photo/,'ART','03'],[/music/,'ART','05'],[/film|cinema/,'ART','04'],[/science|physics|chemistry|biology/,'SCI','01'],[/math/,'SCI','01'],[/computer|programming|software/,'SCI','06'],[/medicine|health/,'SCI','05'],[/cooking|food|gastronom/,'MAN','05'],[/sport|fitness/,'MAN','08'],[/self-help|guide|how-to/,'MAN','03'],[/religion|spiritual|bible|quran|theology/,'REL','01'],[/law|legal|jurisprudence/,'DIR','01'],[/comic|graphic novel|manga/,'FUM','03']];
+    for(const[re,cat,sub]of map){if(re.test(c))return{category:cat,subcategory:sub}}
+    return{category:'',subcategory:''};
+}
+
+async function lookupISBN(){
+    const isbn=document.getElementById('isbn-lookup').value.replace(/[- ]/g,'').trim();
+    if(!isbn||(isbn.length!==10&&isbn.length!==13)){toast('ISBN non valido (10 o 13 cifre)','error');return}
+    // #8 Checksum validation
+    if(!isValidISBN(isbn)){toast('Checksum ISBN non valido. Verifica il codice.','error');return}
+    // #4 Duplicate check
+    const existing=books.find(b=>b.isbn===isbn);
+    if(existing&&!editingId){toast(`ISBN già in biblioteca: "${existing.title}"`,'info');return}
+    const btn=document.getElementById('isbn-lookup-btn');
+    btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
+    try{
+        try{
+            const gr=await fetchT(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1`);
+            if(gr.ok){const gd=await gr.json();if(gd.items&&gd.items.length>0){const vi=gd.items[0].volumeInfo;const thumb=vi.imageLinks?(vi.imageLinks.thumbnail||vi.imageLinks.smallThumbnail||''):'';const catMap=mapGoogleCategory(vi.categories);isbnCache={title:vi.title||'',author:(vi.authors||[]).join(', '),publisher:vi.publisher||'',year:vi.publishedDate?parseInt(vi.publishedDate.match(/\d{4}/)?.[0])||null:null,pages:vi.pageCount||null,isbn,cover:getBestCover(isbn,null,thumb),category:catMap.category,subcategory:catMap.subcategory,source:'Google Books',language:vi.language||''};showISBNResult(isbnCache);toast('Trovato su Google Books','success');return}}
+        }catch(e){if(e.message==='TIMEOUT')toast('Timeout Google Books…','info');else if(isRestricted()){showNetworkError();toast('Rete bloccata.','error');return}}
+        try{
+            const or1=await fetchT(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=details`);
+            if(or1.ok){const od=await or1.json();if(od[`ISBN:${isbn}`]){const d=od[`ISBN:${isbn}`].details;isbnCache={title:d.title||'',author:(d.authors||[]).map(a=>a.name).join(', '),publisher:(d.publishers||[])[0]||'',year:d.publish_date?parseInt(d.publish_date.match(/\d{4}/)?.[0])||null:null,pages:d.number_of_pages||null,isbn,cover:getBestCover(isbn,d.covers?d.covers[0]:null,null),category:'',subcategory:'',source:'Open Library',language:''};showISBNResult(isbnCache);toast('Trovato su Open Library','success');return}}
+        }catch(e){console.warn('OL:',e.message)}
+        try{
+            const or2=await fetchT(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1`);
+            if(or2.ok){const d2=await or2.json();if(d2.docs&&d2.docs.length){const doc=d2.docs[0];isbnCache={title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',source:'OL Search',language:''};showISBNResult(isbnCache);toast('Trovato su OL Search','success');return}}
+        }catch(e){console.warn('OLS:',e.message)}
+        toast('ISBN non trovato.','error');
+    }catch(err){if(isRestricted()){showNetworkError();toast('Rete bloccata.','error')}else toast('Errore imprevisto.','error')}
+    finally{btn.textContent='Cerca';btn.disabled=false}
+}
+function showISBNResult(data){
+    const pv=document.getElementById('isbn-preview');
+    pv.innerHTML=`<img src="${esc(data.cover)}" alt="Copertina" onerror="this.style.display='none'" style="width:90px;border-radius:4px;box-shadow:var(--shadow-sm)"><div class="isbn-preview-info"><h4>${esc(data.title)}</h4><p>${esc(data.author)}</p><p>${[data.publisher,data.year,data.pages?data.pages+' pp.':''].filter(Boolean).join(' · ')}</p>${data.category?`<p style="font-size:.82rem;margin-top:.2rem">Categoria: <strong>${getCatName(data.category)}</strong>${data.subcategory?' — '+getSubName(data.category,data.subcategory):''}</p>`:''}<span class="isbn-source">Fonte: ${esc(data.source||'')}</span><br><button class="btn btn-sm btn-success" onclick="applyISBNData()" style="margin-top:.5rem">Usa questi dati</button></div>`;
+    pv.classList.add('show');
+}
+function showNetworkError(){const pv=document.getElementById('isbn-preview');pv.innerHTML=`<div style="padding:.75rem;width:100%"><p style="font-weight:600;color:var(--warning);margin-bottom:.5rem">&#9888; Ricerca non disponibile in anteprima</p><p style="font-size:.85rem;color:var(--ink-muted)">Scarica il file e aprilo nel browser per la ricerca ISBN.</p></div>`;pv.classList.add('show')}
+function applyISBNData(){
+    if(!isbnCache.title)return;
+    document.getElementById('f-title').value=isbnCache.title;
+    document.getElementById('f-author').value=isbnCache.author;
+    document.getElementById('f-isbn').value=isbnCache.isbn;
+    document.getElementById('f-publisher').value=isbnCache.publisher||'';
+    if(isbnCache.year)document.getElementById('f-year').value=isbnCache.year;
+    if(isbnCache.pages)document.getElementById('f-pages').value=isbnCache.pages;
+    if(isbnCache.cover)document.getElementById('f-cover').value=isbnCache.cover;
+    if(isbnCache.language){const langMap={'en':'en','it':'it','fr':'fr','de':'de','es':'es','la':'la'};document.getElementById('f-language').value=langMap[isbnCache.language]||'other'}
+    if(isbnCache.category){document.getElementById('f-category').value=isbnCache.category;onCategoryChange();if(isbnCache.subcategory)document.getElementById('f-subcategory').value=isbnCache.subcategory}
+    updateAutoLocation();toast('Dati applicati','success');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  SCANNER
+// ════════════════════════════════════════════════════════════════
+// Doppio motore: BarcodeDetector nativo (Chrome/Android) con fallback a Quagga (iOS Safari / browser vecchi).
+let scanStream=null, scanRAF=null, scanDetector=null, scanMode='', scanLastCode='', scanLastTime=0;
+
+function openScannerModal(){openModal('modal-scanner');checkCameraAndStart()}
+function closeScannerModal(){stopScanner();closeModal('modal-scanner')}
+
+async function checkCameraAndStart(){
+    const status=document.getElementById('scanner-status'),vp=document.getElementById('scanner-viewport');
+    vp.querySelectorAll('video,canvas').forEach(el=>el.remove()); // pulisci eventuali sessioni precedenti
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status.innerHTML=msgBox('warn','Fotocamera non supportata da questo browser.');vp.style.display='none';return}
+    vp.style.display='block';
+    // 1) BarcodeDetector nativo: più rapido e preciso
+    if('BarcodeDetector' in window){
+        try{
+            const formats=await window.BarcodeDetector.getSupportedFormats();
+            if(formats.includes('ean_13')||formats.includes('ean_8')){ await startNativeScanner(status,vp); return; }
+        }catch(e){/* prosegui col fallback */}
+    }
+    // 2) Fallback Quagga
+    startQuaggaScanner(status,vp);
+}
+
+async function startNativeScanner(status,vp){
+    scanMode='native';
+    status.textContent='Avvio fotocamera…';
+    let stream;
+    try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}}); }
+    catch(e){ vp.style.display='none'; status.innerHTML=isRestricted()?msgBox('warn','Scanner non disponibile in anteprima. Apri Pinakes in una scheda normale (https) per usare la fotocamera.'):msgBox('err','Permesso fotocamera negato. Consenti l\'accesso e riprova.'); scanMode=''; return; }
+    scanStream=stream;
+    const video=document.createElement('video');
+    video.setAttribute('playsinline','');video.muted=true;video.srcObject=stream;
+    vp.insertBefore(video,vp.firstChild);
+    await video.play().catch(()=>{});
+    status.textContent='Inquadra il codice a barre sul retro del libro…';
+    scanDetector=new window.BarcodeDetector({formats:['ean_13','ean_8']});
+    const tick=async()=>{
+        if(scanMode!=='native')return;
+        try{
+            const codes=await scanDetector.detect(video);
+            for(const c of (codes||[])){ if(handleScannedCode((c.rawValue||'').replace(/[^0-9Xx]/g,''))) return; }
+        }catch(e){/* frame non pronto, riprova */}
+        scanRAF=requestAnimationFrame(tick);
+    };
+    scanRAF=requestAnimationFrame(tick);
+}
+
+function startQuaggaScanner(status,vp){
+    scanMode='quagga';
+    if(typeof Quagga==='undefined'){status.innerHTML=msgBox('warn','Libreria scanner non caricata. Verifica la connessione e ricarica.');vp.style.display='none';return}
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+      .then(s=>{
+        s.getTracks().forEach(t=>t.stop());
+        Quagga.init({inputStream:{name:"Live",type:"LiveStream",target:vp,constraints:{facingMode:"environment",width:{ideal:640},height:{ideal:480}}},decoder:{readers:["ean_reader","ean_8_reader"]},locate:true},err=>{if(err){status.innerHTML=msgBox('err','Errore scanner: '+err.message);return}Quagga.start();status.textContent='Inquadra il codice a barre…'});
+        Quagga.onDetected(r=>{ handleScannedCode((r.codeResult.code||'').replace(/[^0-9Xx]/g,'')); });
+      })
+      .catch(()=>{vp.style.display='none';status.innerHTML=isRestricted()?msgBox('warn','Scanner non disponibile in anteprima.'):msgBox('err','Permesso fotocamera negato.')});
+}
+
+// Validazione + debounce: accetta solo ISBN (EAN-13 978/979 o ISBN-10), ignora altri codici prodotto e letture spurie.
+function handleScannedCode(code){
+    if(!code)return false;
+    if(code.length===13&&!/^97[89]/.test(code))return false;
+    if(code.length!==13&&code.length!==10)return false;
+    const now=Date.now();
+    if(code===scanLastCode&&now-scanLastTime<2500)return false;
+    if(!isValidISBN(code))return false;
+    scanLastCode=code;scanLastTime=now;
+    if(navigator.vibrate){try{navigator.vibrate(60)}catch{}}
+    closeScannerModal();
+    toast('ISBN rilevato: '+code,'success');
+    openAddModal();
+    document.getElementById('isbn-lookup').value=code;
+    setTimeout(lookupISBN,300);
+    return true;
+}
+
+function stopScanner(){
+    scanMode='';
+    if(scanRAF){cancelAnimationFrame(scanRAF);scanRAF=null}
+    scanDetector=null;
+    if(scanStream){try{scanStream.getTracks().forEach(t=>t.stop())}catch{}scanStream=null}
+    const vp=document.getElementById('scanner-viewport');
+    if(vp)vp.querySelectorAll('video').forEach(v=>{try{v.srcObject=null}catch{}v.remove()});
+    try{if(typeof Quagga!=='undefined')Quagga.stop()}catch{}
+}
+function manualISBNEntry(){const isbn=prompt('Inserisci ISBN:');if(isbn&&isbn.trim()){openAddModal();document.getElementById('isbn-lookup').value=isbn.trim();setTimeout(lookupISBN,300)}}
+function msgBox(type,txt){const bg=type==='err'?'var(--danger-light)':'var(--warning-light)';return`<div style="background:${bg};border-radius:var(--radius);padding:1rem;margin:.5rem 0"><p style="font-size:.88rem;color:var(--ink)">${txt}</p></div>`}
+
+// ════════════════════════════════════════════════════════════════
+//  STATISTICS (expanded: #13 #14 #15)
+// ════════════════════════════════════════════════════════════════
+function renderStats(){
+    const total=books.length,read=books.filter(b=>b.status==='Letto').length,reading=books.filter(b=>b.status==='In Corso').length,toRead=books.filter(b=>b.status==='Da Leggere').length;
+    const pages=books.reduce((s,b)=>s+(b.pages||0),0),investment=books.reduce((s,b)=>s+(b.price||0),0);
+    const rated=books.filter(b=>b.rating>0),avg=rated.length?(rated.reduce((s,b)=>s+b.rating,0)/rated.length).toFixed(1):'—';
+    const authors=new Set(books.map(b=>b.author)).size;
+    const yr=new Date().getFullYear();
+    const readYr=books.filter(b=>b.status==='Letto'&&b.finishedDate&&new Date(b.finishedDate).getFullYear()===yr).length;
+    document.getElementById('stats-overview').innerHTML=[
+        {i:'&#128218;',v:total,l:'Totale'},{i:'&#10003;',v:read,l:'Letti'},{i:'&#128214;',v:reading,l:'In Corso'},{i:'&#128203;',v:toRead,l:'Da Leggere'},
+        {i:'&#128197;',v:readYr,l:'Letti quest\'anno'},{i:'&#128196;',v:pages.toLocaleString('it'),l:'Pagine'},{i:'&#9733;',v:avg,l:'Media Voto'},{i:'&#128100;',v:authors,l:'Autori'},{i:'&#8364;',v:'€'+investment.toFixed(0),l:'Investimento'}
+    ].map(s=>`<div class="stat-card"><div class="icon">${s.i}</div><div class="value">${s.v}</div><div class="label">${s.l}</div></div>`).join('');
+    renderCharts();
+}
+function renderCharts(){
+    Object.values(chartInstances).forEach(c=>c.destroy());chartInstances={};
+    const catC={},stC={'Letto':0,'In Corso':0,'Da Leggere':0,'Abbandonato':0},ratC={1:0,2:0,3:0,4:0,5:0},catP={},authC={},fmtC={};
+    books.forEach(b=>{
+        const cn=getCatName(b.category)||'Altro';catC[cn]=(catC[cn]||0)+1;
+        if(stC.hasOwnProperty(b.status))stC[b.status]++;
+        if(b.rating>0)ratC[b.rating]++;
+        catP[cn]=(catP[cn]||0)+(b.pages||0);
+        authC[b.author]=(authC[b.author]||0)+1;
+        fmtC[b.format||'N/D']=(fmtC[b.format||'N/D']||0)+1;
+    });
+    const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:"'Source Sans 3'",size:11},padding:10,usePointStyle:true,color:getComputedStyle(document.body).getPropertyValue('--ink')}}}};
+    const catColors=Object.keys(catC).map(n=>{const e=Object.values(TAXONOMY).find(t=>t.name===n);return e?e.color:'#999'});
+    chartInstances.cat=new Chart(document.getElementById('chart-category'),{type:'doughnut',data:{labels:Object.keys(catC),datasets:[{data:Object.values(catC),backgroundColor:catColors,borderWidth:2,borderColor:getComputedStyle(document.body).getPropertyValue('--cream')}]},options:{...base,cutout:'55%'}});
+    const stColors={'Letto':'#2d6a4f','In Corso':'#e76f51','Da Leggere':'#1d3557','Abbandonato':'#9b2226'};
+    chartInstances.st=new Chart(document.getElementById('chart-status'),{type:'doughnut',data:{labels:Object.keys(stC),datasets:[{data:Object.values(stC),backgroundColor:Object.keys(stC).map(k=>stColors[k]),borderWidth:2,borderColor:getComputedStyle(document.body).getPropertyValue('--cream')}]},options:{...base,cutout:'55%'}});
+    chartInstances.rat=new Chart(document.getElementById('chart-ratings'),{type:'bar',data:{labels:['★','★★','★★★','★★★★','★★★★★'],datasets:[{label:'Libri',data:Object.values(ratC),backgroundColor:'#9c6b3c',borderRadius:4,barThickness:28}]},options:{...base,plugins:{...base.plugins,legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,color:'var(--ink-muted)'}},x:{ticks:{color:'var(--ink-muted)'}}}}});
+    chartInstances.pg=new Chart(document.getElementById('chart-pages'),{type:'bar',data:{labels:Object.keys(catP),datasets:[{label:'Pagine',data:Object.values(catP),backgroundColor:Object.keys(catP).map(n=>{const e=Object.values(TAXONOMY).find(t=>t.name===n);return e?e.color:'#999'}),borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{...base.plugins,legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+    // #14 Top Authors
+    const topAuth=Object.entries(authC).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    chartInstances.auth=new Chart(document.getElementById('chart-authors'),{type:'bar',data:{labels:topAuth.map(a=>a[0].length>18?a[0].slice(0,16)+'…':a[0]),datasets:[{label:'Libri',data:topAuth.map(a=>a[1]),backgroundColor:'#1800ac',borderRadius:4,barThickness:24}]},options:{...base,indexAxis:'y',plugins:{...base.plugins,legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
+    // #15 Format chart
+    const fmtColors=['#8b4513','#2c5f2d','#1d3557','#e76f51','#6a0572','#78909c'];
+    chartInstances.fmt=new Chart(document.getElementById('chart-format'),{type:'doughnut',data:{labels:Object.keys(fmtC),datasets:[{data:Object.values(fmtC),backgroundColor:fmtColors.slice(0,Object.keys(fmtC).length),borderWidth:2,borderColor:getComputedStyle(document.body).getPropertyValue('--cream')}]},options:{...base,cutout:'55%'}});
+    // #13 Timeline
+    const months={};books.forEach(b=>{const d=b.dateAdded?new Date(b.dateAdded):null;if(!d)return;const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');months[k]=(months[k]||0)+1});
+    const sortedMonths=Object.keys(months).sort();
+    chartInstances.tl=new Chart(document.getElementById('chart-timeline'),{type:'line',data:{labels:sortedMonths.map(m=>{const[y,mo]=m.split('-');return['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][parseInt(mo)-1]+' '+y.slice(2)}),datasets:[{label:'Aggiunti',data:sortedMonths.map(m=>months[m]),borderColor:'#a22e37',backgroundColor:'rgba(162,46,55,.12)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'#a22e37'}]},options:{...base,plugins:{...base.plugins,legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}});
+}
+
+// ════════════════════════════════════════════════════════════════
+//  SHELVING
+// ════════════════════════════════════════════════════════════════
+function getAuthorSurname(a){if(!a)return'';const p=a.trim().split(/\s+/);return p[p.length-1]}
+function getSortedShelf(){
+    return[...books].sort((a,b)=>{
+        const ca=CAT_CODES.indexOf(a.category),cb=CAT_CODES.indexOf(b.category);
+        const ia=ca>=0?ca:99,ib=cb>=0?cb:99;
+        if(ia!==ib)return ia-ib;
+        const sa=(a.subcategory||'99'),sb=(b.subcategory||'99');
+        if(sa!==sb)return sa.localeCompare(sb);
+        const na=getAuthorSurname(a.author).toLowerCase(),nb=getAuthorSurname(b.author).toLowerCase();
+        if(na!==nb)return na.localeCompare(nb,'it');
+        return a.title.toLowerCase().localeCompare(b.title.toLowerCase(),'it');
+    });
+}
+function getSpineColor(b){let h=0;const s=b.author+b.title;for(let i=0;i<s.length;i++)h=((h<<5)-h)+s.charCodeAt(i);return SPINE_COLORS[Math.abs(h)%SPINE_COLORS.length]}
+function getSpineHeight(b){return Math.max(60,Math.min(140,50+(b.pages||200)*0.12))}
+
+function renderShelving(){
+    // #11 Room filter
+    const roomFilter=document.getElementById('shelf-room-filter').value;
+    const sorted=getSortedShelf().filter(b=>!roomFilter||b.room===roomFilter);
+    const groups={};
+    sorted.forEach(b=>{const c=b.category||'VAR';if(!groups[c])groups[c]=[];groups[c].push(b)});
+    let html='';
+    CAT_CODES.forEach(cat=>{
+        if(!groups[cat]||!groups[cat].length)return;
+        html+=`<div class="shelf-row" data-cat="${cat}"><div class="shelf-category-label" style="background:${TAXONOMY[cat].color}">${TAXONOMY[cat].name}</div><div class="shelf-scroll-wrap"><div class="shelf-books">`;
+        groups[cat].forEach(b=>{
+            const col=getSpineColor(b),h=getSpineHeight(b);
+            const stDot=b.status.toLowerCase().replace(/ /g,'-');
+            html+=`<div class="shelf-book" style="background:${col};height:${h}px" data-id="${b.id}" data-tt-title="${esc(b.title)}" data-tt-author="${esc(b.author)}" data-tt-loc="${esc(generateLocation(b))}"><span class="spine-text">${esc(getAuthorSurname(b.author))}</span><span class="status-dot st-${stDot}"></span></div>`;
+        });
+        html+=`</div></div></div>`;
+    });
+    if(!html) html='<div class="empty-state"><div class="e-icon">&#128218;</div><p>Nessun libro in questa stanza.</p></div>';
+    document.getElementById('shelving-visual').innerHTML=html;
+    initShelfTooltips();
+    populateSubcatSelect('shelf-suggest-sub',document.getElementById('shelf-suggest-cat').value);
+}
+
+// Floating tooltip system
+let shelfTip=null, activeShelfBook=null, shelfTipBound=false;
+function initShelfTooltips(){
+    if(!shelfTip){shelfTip=document.createElement('div');shelfTip.className='shelf-tooltip';document.body.appendChild(shelfTip)}
+    if(shelfTipBound)return;shelfTipBound=true;
+    const container=document.getElementById('shelving-visual');
+    container.addEventListener('pointerenter',onShelfPointerIn,true);
+    container.addEventListener('pointerleave',onShelfPointerOut,true);
+    container.addEventListener('pointermove',onShelfPointerMove,true);
+    container.addEventListener('click',onShelfTap,true);
+    document.addEventListener('scroll',hideShelfTip,true);
+    document.addEventListener('pointerdown',e=>{if(shelfTip&&!shelfTip.contains(e.target)&&!e.target.closest('.shelf-book'))hideShelfTip()},true);
+}
+function onShelfPointerIn(e){const b=e.target.closest('.shelf-book');if(!b||e.pointerType==='touch')return;showShelfTip(b)}
+function onShelfPointerOut(e){const b=e.target.closest('.shelf-book');if(!b||e.pointerType==='touch')return;const r=e.relatedTarget;if(r&&r.closest&&r.closest('.shelf-book')===b)return;hideShelfTip()}
+function onShelfPointerMove(e){if(e.pointerType==='touch')return;const b=e.target.closest('.shelf-book');if(b&&b!==activeShelfBook)showShelfTip(b);else if(!b)hideShelfTip()}
+function onShelfTap(e){
+    const book=e.target.closest('.shelf-book');
+    // #9 Handle click on tooltip button
+    if(e.target.classList.contains('tt-btn')){const id=parseInt(e.target.dataset.id);if(id)showDetail(id);hideShelfTip();return}
+    if(!book){hideShelfTip();return}
+    if(activeShelfBook===book){
+        // #9 Double tap opens detail
+        const id=parseInt(book.dataset.id);if(id)showDetail(id);hideShelfTip();return;
+    }
+    showShelfTip(book);
+}
+function showShelfTip(bookEl){
+    if(activeShelfBook)activeShelfBook.classList.remove('active');
+    activeShelfBook=bookEl;bookEl.classList.add('active');
+    const t=bookEl.dataset.ttTitle||'',a=bookEl.dataset.ttAuthor||'',l=bookEl.dataset.ttLoc||'',id=bookEl.dataset.id||'';
+    shelfTip.innerHTML=`<strong>${t}</strong>${a}<span class="tt-loc">${l}</span><br><span class="tt-btn" data-id="${id}">Apri scheda</span>`;
+    shelfTip.classList.add('visible');
+    positionShelfTip(bookEl);
+}
+function positionShelfTip(bookEl){
+    const rect=bookEl.getBoundingClientRect(),tipW=shelfTip.offsetWidth,tipH=shelfTip.offsetHeight;
+    let left=rect.left+rect.width/2-tipW/2,top=rect.top-tipH-12;
+    const pad=8;
+    if(left<pad)left=pad;if(left+tipW>window.innerWidth-pad)left=window.innerWidth-tipW-pad;
+    if(top<pad){top=rect.bottom+10;shelfTip.classList.add('below')}else{shelfTip.classList.remove('below')}
+    shelfTip.style.left=left+'px';shelfTip.style.top=top+'px';
+}
+function hideShelfTip(){if(shelfTip)shelfTip.classList.remove('visible');if(activeShelfBook){activeShelfBook.classList.remove('active');activeShelfBook=null}}
+
+function findShelfPosition(title,author,category,subcategory){
+    const surname=getAuthorSurname(author).toLowerCase();
+    const sorted=getSortedShelf();
+    const same=sorted.filter(b=>(b.category||'')===category&&(b.subcategory||'99')===(subcategory||'99'));
+    if(!same.length)return{position:1,leftNeighbor:null,rightNeighbor:null,total:0,leftId:null,rightId:null};
+    let idx=0;
+    for(let i=0;i<same.length;i++){
+        const cs=getAuthorSurname(same[i].author).toLowerCase();
+        if(surname<cs){idx=i;break}
+        if(surname===cs&&title.toLowerCase()<same[i].title.toLowerCase()){idx=i;break}
+        idx=i+1;
+    }
+    return{position:idx+1,total:same.length,leftNeighbor:idx>0?same[idx-1]:null,rightNeighbor:idx<same.length?same[idx]:null,leftId:idx>0?same[idx-1].id:null,rightId:idx<same.length?same[idx].id:null};
+}
+
+function showShelfSuggestion(){
+    const title=document.getElementById('shelf-suggest-title').value.trim();
+    const author=document.getElementById('shelf-suggest-author').value.trim();
+    const cat=document.getElementById('shelf-suggest-cat').value;
+    const sub=document.getElementById('shelf-suggest-sub').value||'99';
+    if(!title||!author||!cat){toast('Compila titolo, autore e categoria','error');return}
+    const r=findShelfPosition(title,author,cat,sub);
+    const loc=`${cat}.${sub}.${getAuthorSurname(author).substring(0,3).toUpperCase().padEnd(3,'_')}`;
+    const catName=getCatName(cat),subName=getSubName(cat,sub);
+    let nh='<div class="suggestion-neighbors">';
+    if(r.leftNeighbor) nh+=`<div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">&#8592; A sinistra</div><strong>${esc(r.leftNeighbor.title)}</strong><br><small>${esc(r.leftNeighbor.author)}</small></div><div class="neighbor-arrow">→</div>`;
+    nh+=`<div class="neighbor-book target"><div style="font-size:.75rem;color:var(--accent)">★ Nuovo</div><strong>${esc(title)}</strong><br><small>${esc(author)}</small></div>`;
+    if(r.rightNeighbor) nh+=`<div class="neighbor-arrow">→</div><div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">A destra &#8594;</div><strong>${esc(r.rightNeighbor.title)}</strong><br><small>${esc(r.rightNeighbor.author)}</small></div>`;
+    nh+='</div>';
+    document.getElementById('shelf-suggestion-result').innerHTML=`<div class="suggestion-card"><h4>Collocazione consigliata</h4>
+        <p><strong>Sezione:</strong> ${catName}${subName?' — '+subName:''} &nbsp; <strong>Posizione:</strong> ${r.position} di ${r.total+1}</p>
+        <p><strong>Segnatura:</strong> <code style="background:var(--parchment);padding:.2rem .5rem;border-radius:3px;font-size:.95rem">${loc}</code></p>
+        <p style="font-size:.88rem;color:var(--ink-muted);margin-top:.5rem">Ordinamento: categoria → sottocategoria → cognome autore → titolo.
+        ${r.leftNeighbor?`Dopo "${esc(r.leftNeighbor.title)}"`:' Primo della sezione'}${r.rightNeighbor?`, prima di "${esc(r.rightNeighbor.title)}"`:''}.
+        </p>${nh}</div>`;
+    // #12 Scroll shelf to highlight neighbors
+    highlightShelfNeighbors(cat,r.leftId,r.rightId);
+}
+
+// #12 Scroll and highlight in shelf
+function highlightShelfNeighbors(cat,leftId,rightId){
+    const row=document.querySelector(`.shelf-row[data-cat="${cat}"]`);
+    if(!row)return;
+    row.scrollIntoView({behavior:'smooth',block:'center'});
+    [leftId,rightId].filter(Boolean).forEach(id=>{
+        const el=row.querySelector(`.shelf-book[data-id="${id}"]`);
+        if(el){el.classList.add('highlighted');setTimeout(()=>el.classList.remove('highlighted'),4500);
+        el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'})}
+    });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BACKUP (expanded: #16 #17 #18)
+// ════════════════════════════════════════════════════════════════
+function exportCSV(filtered=false){
+    const src=filtered?getFilteredBooks():books;
+    const h='Titolo,Autore,ISBN,Editore,Anno,Pagine,Lingua,Categoria,Sottocategoria,Genere,Formato,Ubicazione,Prezzo,Stato,Valutazione,Inizio,Fine,Note';
+    const rows=src.map(b=>[b.title,b.author,b.isbn||'',b.publisher||'',b.year||'',b.pages||'',LANG_NAMES[b.language]||b.language||'',getCatName(b.category),getSubName(b.category,b.subcategory),b.genre||'',b.format||'',generateLocation(b),b.price||0,b.status,b.rating||'',b.startedDate||'',b.finishedDate||'',b.notes||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+    dlFile([h,...rows].join('\n'),`biblioteca${filtered?'_filtrati':''}.csv`,'text/csv;charset=utf-8');
+    toast(`CSV esportato (${src.length} libri)`,'success');
+}
+function exportJSON(){dlFile(JSON.stringify({books,exportDate:new Date().toISOString(),version:4},null,2),'biblioteca.json','application/json');toast('Backup creato','success')}
+
+// #18 Markdown export
+function exportMarkdown(){
+    const grouped={};
+    books.forEach(b=>{const cn=getCatName(b.category);if(!grouped[cn])grouped[cn]=[];grouped[cn].push(b)});
+    let md=`# La Mia Biblioteca\n\n_${books.length} libri — Esportato il ${new Date().toLocaleDateString('it-IT')}_\n\n`;
+    Object.entries(grouped).sort(([a],[b])=>a.localeCompare(b)).forEach(([cat,bks])=>{
+        md+=`## ${cat}\n\n`;
+        bks.sort((a,b)=>a.author.localeCompare(b.author,'it')).forEach(b=>{
+            const stars=b.rating?'★'.repeat(b.rating):'';
+            md+=`- **${b.title}** — ${b.author}${b.year?' ('+b.year+')':''}${stars?' '+stars:''}${b.status==='Letto'?' ✓':b.status==='In Corso'?' ⏳':''}\n`;
+        });
+        md+='\n';
+    });
+    dlFile(md,'biblioteca.md','text/markdown;charset=utf-8');
+    toast('Lista Markdown esportata','success');
+}
+
+// #17 Smart merge import
+function importData(){
+    const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+    inp.onchange=async e=>{
+        const f=e.target.files[0];if(!f)return;
+        const r=new FileReader();
+        r.onload=async ev=>{
+            try{
+                const d=JSON.parse(ev.target.result);
+                if(!d.books||!Array.isArray(d.books)){toast('Formato non valido','error');return}
+                const choice=await customConfirm(
+                    `Importare ${d.books.length} libri?`,
+                    'Scegli "Unisci" per aggiungere solo i nuovi (senza duplicati ISBN), oppure "Sostituisci" per rimpiazzare tutto.',
+                    'Unisci'
+                );
+                if(choice===null)return;
+                if(choice){
+                    // Smart merge
+                    let added=0,skipped=0;
+                    const existingISBNs=new Set(books.filter(b=>b.isbn).map(b=>b.isbn));
+                    const existingTitles=new Set(books.map(b=>(b.title+b.author).toLowerCase()));
+                    d.books.forEach(b=>{
+                        if(b.isbn&&existingISBNs.has(b.isbn)){skipped++;return}
+                        if(existingTitles.has((b.title+b.author).toLowerCase())){skipped++;return}
+                        b.id=Date.now()+Math.random()*1000|0;
+                        books.push(b);added++;
+                    });
+                    persist();renderCatalog();updateHeaderStats();
+                    toast(`${added} aggiunti, ${skipped} duplicati ignorati`,'success');
+                } else {
+                    // Full replace — ask again
+                    const sure=await customConfirm('Sostituire tutto?',`Perderai i ${books.length} libri attuali.`,'Sostituisci tutto');
+                    if(sure){books=d.books;persist();renderCatalog();updateHeaderStats();toast(books.length+' libri importati','success')}
+                }
+            }catch{toast('Errore parsing JSON','error')}
+        };r.readAsText(f);
+    };inp.click();
+}
+function dlFile(c,n,t){const b=new Blob(['\ufeff'+c],{type:t});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
+
+// ════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════════════════════════
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function val(id){return document.getElementById(id).value.trim()}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
+function toast(m,t='info'){const c=document.getElementById('toast-container');const e=document.createElement('div');e.className='toast toast-'+t;e.textContent=m;c.appendChild(e);setTimeout(()=>e.remove(),3200)}
+function checkEnvironment(){if(isRestricted()){const b=document.createElement('div');b.style.cssText='background:var(--info-light);border:1px solid rgba(29,53,87,.2);border-radius:var(--radius);padding:.7rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;font-size:.85rem;color:var(--info);flex-wrap:wrap';b.innerHTML='<span style="font-size:1.1rem">&#8505;</span><span style="flex:1;min-width:200px">Anteprima: <strong>scarica il file</strong> per ISBN, scanner e copertine.</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--info);padding:.2rem">&#10005;</button>';const nav=document.querySelector('.nav-tabs');nav.parentElement.insertBefore(b,nav)}}
+
+document.querySelectorAll('.modal-overlay').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m){m.classList.remove('open');if(m.id==='modal-scanner')stopScanner();if(m.id==='modal-confirm'&&confirmResolver){confirmResolver(false);confirmResolver=null}}})});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');if(m.id==='modal-scanner')stopScanner();if(m.id==='modal-confirm'&&confirmResolver){confirmResolver(false);confirmResolver=null}})});
+
+// ════════════════════════════════════════════════════════════════
+//  PWA — Service Worker (app installabile + uso offline)
+// ════════════════════════════════════════════════════════════════
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+    window.addEventListener('load',()=>{
+        navigator.serviceWorker.register('sw.js').catch(err=>console.warn('Service worker non registrato:',err));
+    });
+}
+</script>
+</body>
+</html>
