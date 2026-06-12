@@ -695,7 +695,9 @@
             <div id="scanner-viewport"><div class="scanner-guide"></div></div>
             <p id="scanner-status" style="font-size:.9rem;color:var(--ink-muted);margin-top:.5rem">Verifica fotocamera…</p>
             <p id="scanner-debug" style="font-size:.72rem;color:var(--ink-muted);opacity:.7;margin-top:.2rem;font-family:var(--font-mono)"></p>
+            <input type="file" accept="image/*" capture="environment" id="scanner-photo" style="display:none" onchange="decodePhoto(event)">
             <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.7rem;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="document.getElementById('scanner-photo').click()">&#128247; Scatta foto del codice</button>
                 <button class="btn btn-brand-soft" id="scanner-torch" onclick="toggleTorch()" style="display:none">&#128294; Torcia</button>
                 <button class="btn btn-outline" onclick="closeScannerModal()">Chiudi</button>
             </div>
@@ -1114,6 +1116,10 @@ const GBOOKS_KEY_LS='pinakes_gbooks_key';
 function getGBooksKey(){try{return (localStorage.getItem(GBOOKS_KEY_LS)||'').trim();}catch{return '';}}
 function setGBooksKey(v){try{localStorage.setItem(GBOOKS_KEY_LS,(v||'').trim());}catch{}}
 function normalizeISBN(s){return (s||'').toUpperCase().replace(/[^0-9X]/g,'');}
+// Conversione tra le forme ISBN, per cercare il libro sotto ENTRAMBE nei cataloghi.
+function isbn13to10(i){ if(!/^978\d{10}$/.test(i))return ''; const core=i.slice(3,12); let s=0; for(let k=0;k<9;k++)s+=(10-k)*parseInt(core[k],10); let c=(11-(s%11))%11; return core+(c===10?'X':String(c)); }
+function isbn10to13(i){ if(!/^\d{9}[\dX]$/.test(i))return ''; const core='978'+i.slice(0,9); let s=0; for(let k=0;k<12;k++)s+=parseInt(core[k],10)*(k%2===0?1:3); return core+String((10-(s%10))%10); }
+function isbnVariants(isbn){ const set=new Set([isbn]); if(isbn.length===13){const t=isbn13to10(isbn);if(t)set.add(t);} else if(isbn.length===10){const t=isbn10to13(isbn);if(t)set.add(t);} return [...set]; }
 
 async function lookupISBN(autoApply=false){
     const isbn=normalizeISBN(document.getElementById('isbn-lookup').value);
@@ -1155,25 +1161,32 @@ function showLookupFailure(isbn,log){
 // Catena di fonti. Ritorna {data, log:[{source,status}]}; data=null se nessuna fonte ha il libro.
 async function resolveISBN(isbn){
     const log=[]; const key=getGBooksKey();
-    // 1) Google Books (con chiave gratuita se impostata, altrimenti quota condivisa)
+    const variants=isbnVariants(isbn); // cerca sotto ISBN-13 e ISBN-10 equivalenti
+    // 1) Google Books (chiave opzionale) — cerca tutte le forme con OR
     try{
-        const url=`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&country=IT&maxResults=1`+(key?`&key=${encodeURIComponent(key)}`:'');
+        const q=variants.map(v=>'isbn:'+v).join(' OR ');
+        const url=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&country=IT&maxResults=1`+(key?`&key=${encodeURIComponent(key)}`:'');
         const r=await fetchT(url,7000);
         if(r.status===429){ log.push({source:'Google Books',status:key?'quota della chiave esaurita':'quota condivisa esaurita'}); }
         else if(r.ok){ const j=await r.json(); if(j.items&&j.items.length){ log.push({source:'Google Books',status:'trovato'}); return {data:fromGoogle(j.items[0].volumeInfo,isbn),log}; } log.push({source:'Google Books',status:'non trovato'}); }
         else { log.push({source:'Google Books',status:'HTTP '+r.status}); }
     }catch(e){ log.push({source:'Google Books',status:e.message==='TIMEOUT'?'timeout':'rete bloccata'}); if(e.message!=='TIMEOUT'&&isRestricted()) throw Object.assign(new Error('restricted'),{log}); }
-    // 2) Open Library — jscmd=data (autori + copertina diretti)
+    // 2) Open Library — jscmd=data, su tutte le forme ISBN
     try{
-        const r=await fetchT(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,7000);
-        if(r.ok){ const j=await r.json(); const rec=j['ISBN:'+isbn]; if(rec&&rec.title){ log.push({source:'Open Library',status:'trovato'}); return {data:fromOLData(rec,isbn),log}; } log.push({source:'Open Library',status:'non trovato'}); }
+        const bibkeys=variants.map(v=>'ISBN:'+v).join(',');
+        const r=await fetchT(`https://openlibrary.org/api/books?bibkeys=${encodeURIComponent(bibkeys)}&format=json&jscmd=data`,7000);
+        if(r.ok){ const j=await r.json(); let rec=null; for(const v of variants){ if(j['ISBN:'+v]&&j['ISBN:'+v].title){ rec=j['ISBN:'+v]; break; } } if(rec){ log.push({source:'Open Library',status:'trovato'}); return {data:fromOLData(rec,isbn),log}; } log.push({source:'Open Library',status:'non trovato'}); }
         else log.push({source:'Open Library',status:'HTTP '+r.status});
     }catch(e){ log.push({source:'Open Library',status:e.message==='TIMEOUT'?'timeout':'errore'}); }
-    // 3) Open Library — ricerca
+    // 3) Open Library — ricerca, su tutte le forme
     try{
-        const r=await fetchT(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1&fields=title,author_name,publisher,first_publish_year,number_of_pages_median,cover_i,language`,7000);
-        if(r.ok){ const j=await r.json(); if(j.docs&&j.docs.length){ log.push({source:'Ricerca OL',status:'trovato'}); return {data:fromOLSearch(j.docs[0],isbn),log}; } log.push({source:'Ricerca OL',status:'non trovato'}); }
-        else log.push({source:'Ricerca OL',status:'HTTP '+r.status});
+        let doc=null;
+        for(const v of variants){
+            const r=await fetchT(`https://openlibrary.org/search.json?isbn=${v}&limit=1&fields=title,author_name,publisher,first_publish_year,number_of_pages_median,cover_i,language`,6000);
+            if(r.ok){ const j=await r.json(); if(j.docs&&j.docs.length){ doc=j.docs[0]; break; } }
+        }
+        if(doc){ log.push({source:'Ricerca OL',status:'trovato'}); return {data:fromOLSearch(doc,isbn),log}; }
+        log.push({source:'Ricerca OL',status:'non trovato'});
     }catch(e){ log.push({source:'Ricerca OL',status:e.message==='TIMEOUT'?'timeout':'errore'}); }
     return {data:null,log};
 }
@@ -1357,6 +1370,52 @@ function scannerManualSubmit(){
     openAddModal();
     document.getElementById('isbn-lookup').value=v;
     setTimeout(()=>lookupISBN(true),250);
+}
+
+// Lettura da FOTO: scatto ad alta risoluzione, poi decodifica (BarcodeDetector → ZXing). Più affidabile del video.
+function loadImg(url){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('img'));i.src=url;});}
+async function decodeImageURL(url){
+    // 1) BarcodeDetector sull'immagine
+    if('BarcodeDetector' in window){
+        try{
+            const fmts=await window.BarcodeDetector.getSupportedFormats();
+            if(fmts.includes('ean_13')){
+                const det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(f=>fmts.includes(f))});
+                const img=await loadImg(url);
+                const res=await det.detect(img);
+                if(res&&res.length){
+                    const ean=res.map(r=>(r.rawValue||'').replace(/\D/g,'')).find(v=>/^(97[89]\d{10})$/.test(v));
+                    return ean||res.map(r=>(r.rawValue||'').replace(/[^0-9Xx]/g,'')).find(Boolean)||null;
+                }
+            }
+        }catch(e){/* passa a ZXing */}
+    }
+    // 2) ZXing sull'immagine
+    if(typeof ZXing!=='undefined'){
+        try{
+            const hints=new Map();
+            try{hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);hints.set(ZXing.DecodeHintType.TRY_HARDER,true);}catch(e){}
+            const reader=new ZXing.BrowserMultiFormatReader(hints);
+            const r=await reader.decodeFromImageUrl(url);
+            try{reader.reset&&reader.reset();}catch(e){}
+            if(r){return ((r.getText?r.getText():r.text)||'').replace(/[^0-9Xx]/g,'');}
+        }catch(e){/* nessun codice */}
+    }
+    return null;
+}
+async function decodePhoto(e){
+    const file=e.target.files&&e.target.files[0]; e.target.value='';
+    if(!file)return;
+    const status=document.getElementById('scanner-status'); if(status)status.textContent='Leggo la foto…'; setDebug('Decodifica foto…');
+    const url=URL.createObjectURL(file);
+    try{
+        const code=await decodeImageURL(url);
+        if(code&&handleScannedCode(normalizeISBN(code))) return; // ok: chiude e cerca
+        if(code){ setDebug('Letto '+code+' — non è un ISBN valido'); toast('Codice letto ma non è un ISBN valido. Riprova o digita l\'ISBN.','error'); }
+        else { setDebug(''); toast('Nessun codice riconosciuto nella foto. Avvicina, metti a fuoco e riempi l\'inquadratura — oppure digita l\'ISBN.','error'); }
+        if(status)status.textContent='Inquadra il codice, scatta una foto, oppure digita l\'ISBN.';
+    }catch(err){ if(status)status.textContent='Inquadra il codice o digita l\'ISBN.'; toast('Non sono riuscito a leggere la foto. Digita l\'ISBN qui sotto.','error'); }
+    finally{ URL.revokeObjectURL(url); }
 }
 
 function stopScanner(){

@@ -5,8 +5,8 @@
    - Librerie/font da CDN (Chart.js, Quagga, Google Fonts): stale-while-revalidate
    - Lookup ISBN (Google Books / Open Library) e copertine: solo rete, mai in cache
    Bump SHELL_CACHE quando cambi index.html o gli asset locali. */
-const SHELL_CACHE = 'pinakes-shell-v6';
-const RUNTIME_CACHE = 'pinakes-runtime-v6';
+const SHELL_CACHE = 'pinakes-shell-v7';
+const RUNTIME_CACHE = 'pinakes-runtime-v7';
 
 const SHELL_ASSETS = [
   './',

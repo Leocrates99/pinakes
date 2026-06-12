@@ -22,14 +22,17 @@ e scaricare le copertine).
 Tre modi, dalla scheda **Catalogo**:
 
 ### A) Con lo scanner (il più veloce) 📷
-1. Tocca **▢ Scanner**.
-2. Inquadra il **codice a barre** sul retro del libro. Con poca luce, tocca **🔦 Torcia**.
-3. Con la **sola scansione**, Pinakes riconosce l'ISBN, cerca il libro e **compila da solo**
-   titolo, autore, editore, anno, pagine, lingua, categoria e **copertina**. Ti basta controllare
-   **stanza/scaffale** e toccare **Salva**.
+1. Tocca **▢ Scanner**. Hai **tre modi**, usa quello che funziona meglio:
+   - **Scansione dal vivo**: inquadra il codice a barre (con poca luce, **🔦 Torcia**).
+   - **📷 Scatta foto del codice**: scatti una foto nitida e Pinakes la legge — **il modo più
+     affidabile**, soprattutto se la lettura dal vivo fatica.
+   - **Digita l'ISBN**: scrivi a mano le cifre sotto il codice (es. `978…`).
+2. Pinakes riconosce l'ISBN, cerca il libro e **compila da solo** titolo, autore, editore, anno,
+   pagine, lingua, categoria e **copertina**. Controlli **stanza/scaffale** e tocchi **Salva**.
 
-> Lo scanner riconosce solo i codici dei libri (ISBN 978/979 o ISBN-10): i codici di altri
-> prodotti vengono ignorati. Una piccola vibrazione conferma la lettura.
+> Il codice sul retro del libro (es. `9 783161 484100`) **è** l'ISBN-13 (978-3-16-148410-0).
+> Pinakes lo cerca in **entrambe** le forme, ISBN-13 e ISBN-10, per trovarlo più facilmente.
+> Una piccola vibrazione conferma la lettura.
 
 ### B) Cercando l'ISBN a mano
 1. Tocca **+ Aggiungi** (oppure, nel modale Scanner, usa il campo **«digita l'ISBN»**).
