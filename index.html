@@ -762,13 +762,13 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v8';
+const APP_VERSION = '2026-06-12 · v9';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    loadFromStorage(); buildCategorySelects(); setupTabs(); setupFilters(); renderCatalog(); updateHeaderStats(); checkEnvironment(); initBackToTop(); initTheme(); loadGBooksKey();
+    loadFromStorage(); buildCategorySelects(); setupTabs(); setupFilters(); renderCatalog(); updateHeaderStats(); checkEnvironment(); checkInAppBrowser(); initBackToTop(); initTheme(); loadGBooksKey();
 });
 
 function loadFromStorage(){ try{books=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{books=[]} if(!books.length) loadSampleBooks(); }
@@ -1728,6 +1728,21 @@ function esc(s){const d=document.createElement('div');d.textContent=s||'';return
 function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 function toast(m,t='info'){const c=document.getElementById('toast-container');const e=document.createElement('div');e.className='toast toast-'+t;e.textContent=m;c.appendChild(e);setTimeout(()=>e.remove(),3200)}
 function checkEnvironment(){if(isRestricted()){const b=document.createElement('div');b.style.cssText='background:var(--info-light);border:1px solid rgba(29,53,87,.2);border-radius:var(--radius);padding:.7rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;font-size:.85rem;color:var(--info);flex-wrap:wrap';b.innerHTML='<span style="font-size:1.1rem">&#8505;</span><span style="flex:1;min-width:200px">Anteprima: <strong>scarica il file</strong> per ISBN, scanner e copertine.</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--info);padding:.2rem">&#10005;</button>';const nav=document.querySelector('.nav-tabs');nav.parentElement.insertBefore(b,nav)}}
+// Rileva i browser "dentro un'app" (WhatsApp, Instagram, ecc.) dove fotocamera e cache fanno i capricci.
+function isInAppBrowser(){
+    const ua=navigator.userAgent||'';
+    if(/FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|WhatsApp|WeChat|MicroMessenger|Snapchat|TikTok|Pinterest|GSA/i.test(ua))return true;
+    const iOS=/iPhone|iPad|iPod/i.test(ua);
+    if(iOS && !/Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua))return true; // WKWebView iOS
+    return false;
+}
+function checkInAppBrowser(){
+    try{ if(!isInAppBrowser())return; if(sessionStorage.getItem('pinakes-inapp-dismissed'))return; }catch(e){}
+    const b=document.createElement('div');
+    b.style.cssText='background:var(--warning-light);border:1px solid var(--warning);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.6rem;font-size:.88rem;color:var(--ink);line-height:1.55;flex-wrap:wrap';
+    b.innerHTML='<span style="font-size:1.15rem">&#9888;</span><span style="flex:1;min-width:200px">Hai aperto Pinakes nel <strong>browser interno di un\'app</strong> (es. WhatsApp). Qui <strong>fotocamera</strong> e <strong>aggiornamenti</strong> spesso non funzionano. Tocca i tre puntini (&#8943;) in alto e scegli <strong>«Apri in Safari»</strong> — poi aggiungilo alla Home per usarlo come app.</span><button onclick="try{sessionStorage.setItem(\'pinakes-inapp-dismissed\',\'1\')}catch(e){};this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1.15rem;color:var(--ink-muted);padding:.1rem">&#10005;</button>';
+    const nav=document.querySelector('.nav-tabs'); if(nav&&nav.parentElement)nav.parentElement.insertBefore(b,nav);
+}
 
 document.querySelectorAll('.modal-overlay').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m){m.classList.remove('open');if(m.id==='modal-scanner')stopScanner();if(m.id==='modal-confirm'&&confirmResolver){confirmResolver(false);confirmResolver=null}}})});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');if(m.id==='modal-scanner')stopScanner();if(m.id==='modal-confirm'&&confirmResolver){confirmResolver(false);confirmResolver=null}})});
