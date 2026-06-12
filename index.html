@@ -623,8 +623,13 @@
                 <input type="text" id="gbooks-key" class="filter-select" style="flex:1;min-width:240px" placeholder="Incolla qui la chiave API (es. AIza…)" autocomplete="off" spellcheck="false">
                 <button class="btn btn-primary" onclick="saveGBooksKey()">Salva chiave</button>
                 <button class="btn btn-brand-soft" onclick="testSearch()">Prova ricerca</button>
+                <button class="btn btn-outline" onclick="runDiagnostics()">&#129514; Diagnostica</button>
             </div>
             <div id="search-test-result" style="margin-top:.7rem;font-size:.9rem;line-height:1.5"></div>
+            <div style="margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--parchment-dark);display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;justify-content:space-between">
+                <span style="font-size:.8rem;color:var(--ink-muted);font-family:var(--font-mono)">Pinakes — versione <span id="app-version">—</span></span>
+                <button class="btn btn-brand-soft btn-sm" onclick="forceUpdate()">&#8635; Forza aggiornamento</button>
+            </div>
         </div>
     </section>
 </div>
@@ -757,6 +762,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
+const APP_VERSION = '2026-06-12 · v8';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -1195,7 +1201,34 @@ function fromOLData(rec,isbn){const cv=rec.cover?(rec.cover.large||rec.cover.med
 function fromOLSearch(doc,isbn){return{title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',source:'Open Library',language:(doc.language&&doc.language[0])||''};}
 
 // Impostazioni ricerca (scheda Backup)
-function loadGBooksKey(){const el=document.getElementById('gbooks-key');if(el)el.value=getGBooksKey();}
+function loadGBooksKey(){const el=document.getElementById('gbooks-key');if(el)el.value=getGBooksKey();const v=document.getElementById('app-version');if(v)v.textContent=APP_VERSION;}
+
+// Diagnostica: testa connessione ai database e mostra in chiaro cosa funziona / cosa è bloccato.
+async function runDiagnostics(){
+    const el=document.getElementById('search-test-result'); if(!el)return;
+    el.innerHTML='<span class="spinner" style="border-top-color:var(--accent);border-color:var(--accent-border)"></span> Diagnostica in corso…';
+    const L=[];
+    L.push('App: '+APP_VERSION);
+    L.push('Online: '+(navigator.onLine?'sì':'NO'));
+    let sw='non supportato';
+    if('serviceWorker' in navigator){ try{const reg=await navigator.serviceWorker.getRegistration(); sw=reg?(navigator.serviceWorker.controller?'attivo e in controllo':'registrato'):'non registrato';}catch(e){sw='errore';} }
+    L.push('Service worker: '+sw);
+    L.push('BarcodeDetector: '+('BarcodeDetector' in window?'disponibile':'assente (uso ZXing)'));
+    L.push('ZXing: '+(typeof ZXing!=='undefined'?'caricato':'NON caricato'));
+    L.push('Chiave Google: '+(getGBooksKey()?'impostata':'assente'));
+    const testISBN='9780140328721';
+    // Google
+    try{ const k=getGBooksKey(); const r=await fetchT('https://www.googleapis.com/books/v1/volumes?q=isbn:'+testISBN+'&country=IT&maxResults=1'+(k?'&key='+encodeURIComponent(k):''),9000); L.push('Google Books: HTTP '+r.status+(r.status===429?' — quota esaurita':r.ok?' — OK':'')); }
+    catch(e){ L.push('Google Books: BLOCCATO o irraggiungibile ('+(e.message==='TIMEOUT'?'timeout':'rete/CORS')+')'); }
+    // Open Library
+    try{ const r=await fetchT('https://openlibrary.org/api/books?bibkeys=ISBN:'+testISBN+'&format=json&jscmd=data',9000); let found=false; try{const j=await r.json(); found=!!(j['ISBN:'+testISBN]&&j['ISBN:'+testISBN].title);}catch(e){} L.push('Open Library: HTTP '+r.status+(found?' — OK (libro test trovato)':r.ok?' — risposta ricevuta':'')); }
+    catch(e){ L.push('Open Library: BLOCCATO o irraggiungibile ('+(e.message==='TIMEOUT'?'timeout':'rete/CORS')+')'); }
+    // Copertina
+    try{ await loadImg('https://covers.openlibrary.org/b/id/240727-S.jpg'); L.push('Copertine: OK'); }
+    catch(e){ L.push('Copertine: bloccate'); }
+    const anyBlocked=L.some(x=>/BLOCCAT|NON caricato|non registrato/i.test(x));
+    el.innerHTML='<pre style="white-space:pre-wrap;font-family:var(--font-mono);font-size:.78rem;background:var(--parchment);border:1px solid var(--parchment-dark);border-radius:var(--radius);padding:.7rem;line-height:1.5;overflow-x:auto">'+esc(L.join('\n'))+'</pre>'+(anyBlocked?'<p style="font-size:.85rem;color:var(--danger);margin-top:.4rem">Qualcosa è bloccato: probabile un <strong>blocco contenuti/privacy</strong>, un <strong>browser in-app</strong> o una rete che filtra. Apri Pinakes in Safari/Chrome normale, senza blocco-pubblicità, e riprova.</p>':'<p style="font-size:.85rem;color:var(--success);margin-top:.4rem">Connessione ai database OK. Se un libro non si trova, è una questione di copertura: imposta la chiave Google Books.</p>');
+}
 function saveGBooksKey(){const el=document.getElementById('gbooks-key');const v=el?el.value.trim():'';setGBooksKey(v);toast(v?'Chiave salvata su questo dispositivo':'Chiave rimossa','success');}
 async function testSearch(){
     const el=document.getElementById('search-test-result');if(!el)return;
@@ -1703,9 +1736,22 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 //  PWA — Service Worker (app installabile + uso offline)
 // ════════════════════════════════════════════════════════════════
 if('serviceWorker' in navigator && location.protocol!=='file:'){
+    // Quando un nuovo service worker prende il controllo, ricarica una volta -> l'utente è sempre sull'ultima versione.
+    let swRefreshing=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(swRefreshing)return; swRefreshing=true; location.reload(); });
     window.addEventListener('load',()=>{
-        navigator.serviceWorker.register('sw.js').catch(err=>console.warn('Service worker non registrato:',err));
+        navigator.serviceWorker.register('sw.js').then(reg=>{
+            reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(nw)nw.addEventListener('statechange',()=>{ if(nw.state==='installed'&&navigator.serviceWorker.controller){ nw.postMessage('skipWaiting'); } }); });
+            setInterval(()=>reg.update().catch(()=>{}),60000);
+        }).catch(err=>console.warn('Service worker non registrato:',err));
     });
+}
+// Forza l'aggiornamento all'ultima versione (svuota cache + service worker e ricarica)
+async function forceUpdate(){
+    toast('Aggiorno all\'ultima versione…','info');
+    try{ if('serviceWorker' in navigator){ const rs=await navigator.serviceWorker.getRegistrations(); for(const r of rs) await r.unregister(); } }catch(e){}
+    try{ if(window.caches){ const ks=await caches.keys(); for(const k of ks) await caches.delete(k); } }catch(e){}
+    location.reload(true);
 }
 </script>
 </body>
