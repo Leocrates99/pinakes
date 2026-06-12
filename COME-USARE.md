@@ -32,13 +32,37 @@ Tre modi, dalla scheda **Catalogo**:
 > prodotti vengono ignorati. Una piccola vibrazione conferma la lettura.
 
 ### B) Cercando l'ISBN a mano
-1. Tocca **+ Aggiungi**.
-2. Scrivi l'**ISBN** (10 o 13 cifre) nel campo in alto e premi **Cerca**.
-3. Premi **Usa questi dati**, completa e **Salva**.
+1. Tocca **+ Aggiungi** (oppure, nel modale Scanner, usa il campo **«digita l'ISBN»**).
+2. Scrivi l'**ISBN** (10 o 13 cifre) e premi **Cerca**.
+3. I dati si **compilano da soli** (copertina inclusa): controlla la collocazione e **Salva**.
 
 ### C) Inserimento manuale
 Tocca **+ Aggiungi** e compila i campi a mano (utile per libri senza ISBN: vecchie edizioni,
 classici, libri antichi).
+
+---
+
+## 2-bis. Ricerca affidabile su ogni libro — chiave gratuita Google Books
+
+La ricerca usa fonti libere (Google Books + Open Library). Senza chiave, la **quota condivisa**
+di Google può essere satura e alcuni libri — specie **italiani** — non vengono trovati (vedrai un
+messaggio che lo dice). Con una **chiave gratuita** di Google Books la ricerca diventa affidabile
+su quasi ogni libro registrato. È **gratis** (1000 ricerche/giorno, nessuna fatturazione) e la
+chiave resta **solo sul tuo dispositivo**.
+
+**Come ottenerla (5 minuti, una volta sola):**
+1. Vai su <https://console.cloud.google.com/> e accedi con un account Google.
+2. In alto, **crea un progetto** (un nome qualsiasi, es. «Pinakes»).
+3. Menu **API e servizi → Libreria**, cerca **Books API** e premi **Abilita**.
+4. Menu **API e servizi → Credenziali → Crea credenziali → Chiave API**. Copia la chiave (`AIza…`).
+5. In Pinakes, scheda **Backup → Ricerca ISBN**: incolla la chiave e premi **Salva chiave**.
+   Premi **Prova ricerca** per verificare che funzioni.
+
+> Consiglio (sicurezza): nella console Google puoi **limitare** la chiave alla sola *Books API*
+> e al tuo sito (`leocrates99.github.io`), così resta inutilizzabile altrove.
+
+Se un libro non è in nessun catalogo (edizioni locali, vecchie o senza ISBN), l'ISBN resta scritto
+e completi i campi a mano.
 
 ---
 

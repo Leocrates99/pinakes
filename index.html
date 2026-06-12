@@ -616,6 +616,16 @@
             <div class="backup-card" onclick="window.print()"><div class="b-icon">&#128424;</div><div class="b-title">Stampa</div><div class="b-desc">Versione stampabile</div></div>
             <div class="backup-card" onclick="importData()"><div class="b-icon">&#128229;</div><div class="b-title">Importa</div><div class="b-desc">Carica o unisci backup</div></div>
         </div>
+        <div class="shelving-section" style="margin-top:1.75rem">
+            <h3>Ricerca ISBN — chiave Google Books <span style="font-weight:400;font-style:italic;color:var(--ink-muted);font-size:.9rem">(opzionale, gratuita)</span></h3>
+            <p style="font-size:.93rem;color:var(--ink-light);font-family:var(--font-body);line-height:1.6;margin-bottom:.85rem">Senza chiave, la ricerca usa la quota condivisa di Google Books + Open Library: può essere satura e non trovare alcuni libri (specie italiani). Con una <strong>chiave gratuita</strong> di Google Books (1000 ricerche al giorno, nessun costo né fatturazione) la ricerca diventa affidabile su quasi ogni libro registrato. La chiave resta <strong>solo su questo dispositivo</strong>. <a href="https://console.cloud.google.com/apis/library/books.googleapis.com" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">Come ottenerla &rarr;</a></p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+                <input type="text" id="gbooks-key" class="filter-select" style="flex:1;min-width:240px" placeholder="Incolla qui la chiave API (es. AIza…)" autocomplete="off" spellcheck="false">
+                <button class="btn btn-primary" onclick="saveGBooksKey()">Salva chiave</button>
+                <button class="btn btn-brand-soft" onclick="testSearch()">Prova ricerca</button>
+            </div>
+            <div id="search-test-result" style="margin-top:.7rem;font-size:.9rem;line-height:1.5"></div>
+        </div>
     </section>
 </div>
 
@@ -684,10 +694,17 @@
         <div class="scanner-area">
             <div id="scanner-viewport"><div class="scanner-guide"></div></div>
             <p id="scanner-status" style="font-size:.9rem;color:var(--ink-muted);margin-top:.5rem">Verifica fotocamera…</p>
-            <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+            <p id="scanner-debug" style="font-size:.72rem;color:var(--ink-muted);opacity:.7;margin-top:.2rem;font-family:var(--font-mono)"></p>
+            <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.7rem;flex-wrap:wrap">
                 <button class="btn btn-brand-soft" id="scanner-torch" onclick="toggleTorch()" style="display:none">&#128294; Torcia</button>
-                <button class="btn btn-brand-soft" onclick="closeScannerModal();manualISBNEntry()">Inserisci manualmente</button>
-                <button class="btn btn-outline" onclick="closeScannerModal()">Annulla</button>
+                <button class="btn btn-outline" onclick="closeScannerModal()">Chiudi</button>
+            </div>
+            <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--parchment-dark);text-align:left">
+                <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);display:block;margin-bottom:.35rem">Oppure digita l'ISBN dell'etichetta</label>
+                <div style="display:flex;gap:.5rem">
+                    <input type="text" inputmode="numeric" id="scanner-manual-input" placeholder="978… (10 o 13 cifre)" class="filter-select" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();scannerManualSubmit();}">
+                    <button class="btn btn-primary" onclick="scannerManualSubmit()">Cerca</button>
+                </div>
             </div>
         </div>
     </div>
@@ -743,7 +760,7 @@ const STORAGE_KEY = 'biblioteca_books_v4';
 //  INIT
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    loadFromStorage(); buildCategorySelects(); setupTabs(); setupFilters(); renderCatalog(); updateHeaderStats(); checkEnvironment(); initBackToTop(); initTheme();
+    loadFromStorage(); buildCategorySelects(); setupTabs(); setupFilters(); renderCatalog(); updateHeaderStats(); checkEnvironment(); initBackToTop(); initTheme(); loadGBooksKey();
 });
 
 function loadFromStorage(){ try{books=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{books=[]} if(!books.length) loadSampleBooks(); }
@@ -1090,53 +1107,91 @@ function mapGoogleCategory(cats){
     return{category:'',subcategory:''};
 }
 
+// ── DATABASE DI CONSULTAZIONE ISBN (strumento separato dallo scanner) ──────────
+// Fonti libere e gratuite, tutto client-side, nessun backend. Chiave Google Books OPZIONALE
+// (gratuita) per affidabilità su quasi ogni libro; senza chiave si usa la quota condivisa + Open Library.
+const GBOOKS_KEY_LS='pinakes_gbooks_key';
+function getGBooksKey(){try{return (localStorage.getItem(GBOOKS_KEY_LS)||'').trim();}catch{return '';}}
+function setGBooksKey(v){try{localStorage.setItem(GBOOKS_KEY_LS,(v||'').trim());}catch{}}
+function normalizeISBN(s){return (s||'').toUpperCase().replace(/[^0-9X]/g,'');}
+
 async function lookupISBN(autoApply=false){
-    const isbn=document.getElementById('isbn-lookup').value.replace(/[- ]/g,'').trim();
-    if(!isbn||(isbn.length!==10&&isbn.length!==13)){toast('ISBN non valido (10 o 13 cifre)','error');return}
-    if(!isValidISBN(isbn)){toast('Checksum ISBN non valido. Verifica il codice.','error');return}
+    const isbn=normalizeISBN(document.getElementById('isbn-lookup').value);
+    if(isbn.length!==10&&isbn.length!==13){toast('Inserisci un ISBN di 10 o 13 cifre','error');return;}
+    if(!isValidISBN(isbn)){toast('ISBN non valido (checksum errato). Controlla le cifre.','error');return;}
     const existing=books.find(b=>b.isbn===isbn);
-    if(existing&&!editingId){toast(`ISBN già in biblioteca: "${existing.title}"`,'info');return}
+    if(existing&&!editingId){toast(`Già in biblioteca: "${existing.title}"`,'info');return;}
     const btn=document.getElementById('isbn-lookup-btn');
-    if(btn){btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
+    if(btn){btn.dataset.label=btn.dataset.label||btn.textContent;btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
     const pv=document.getElementById('isbn-preview');
-    pv.innerHTML='<div style="padding:.85rem;display:flex;align-items:center;gap:.6rem;width:100%"><span class="spinner" style="border-top-color:var(--accent);border-color:var(--accent-border)"></span><span style="font-size:.9rem;color:var(--ink-muted)">Cerco il libro nei cataloghi…</span></div>';
     pv.classList.add('show');
+    pv.innerHTML='<div style="padding:.85rem;display:flex;align-items:center;gap:.6rem;width:100%"><span class="spinner" style="border-top-color:var(--accent);border-color:var(--accent-border)"></span><span style="font-size:.9rem;color:var(--ink-muted)">Cerco il libro…</span></div>';
     try{
-        const data=await resolveISBN(isbn);
+        const {data,log}=await resolveISBN(isbn);
         if(data&&(data.title||data.author)){
             isbnCache=data;
             if(autoApply) applyISBNData(true);
             showISBNResult(data,autoApply);
             toast('Libro riconosciuto'+(data.source?' · '+data.source:''),'success');
         }else{
-            pv.classList.remove('show');pv.innerHTML='';
-            toast('ISBN non trovato nei cataloghi. Puoi inserire i dati a mano.','error');
+            showLookupFailure(isbn,log);
         }
     }catch(err){
-        if(isRestricted()){showNetworkError();toast('Ricerca non disponibile in anteprima.','error');}
-        else{pv.classList.remove('show');pv.innerHTML='';toast('Errore di rete durante la ricerca.','error');}
-    }finally{ if(btn){btn.textContent='Cerca';btn.disabled=false;} }
+        if(err&&err.log) showLookupFailure(isbn,err.log);
+        else if(isRestricted()) showNetworkError();
+        else showLookupFailure(isbn,[{source:'Rete',status:'errore di connessione'}]);
+    }finally{ if(btn){btn.textContent=btn.dataset.label||'Cerca';btn.disabled=false;} }
 }
 
-// Catena di fonti libere e gratuite: Google Books (edizione IT) -> Open Library (details) -> ricerca Open Library.
-// Ritorna i dati normalizzati del libro, oppure null. Tutto client-side, senza chiavi API.
+function showLookupFailure(isbn,log){
+    const pv=document.getElementById('isbn-preview');
+    const rows=(log||[]).map(l=>`<li>${esc(l.source)}: <strong>${esc(l.status)}</strong></li>`).join('');
+    const quota=(log||[]).some(l=>/quota/.test(l.status));
+    pv.classList.add('show');
+    pv.innerHTML=`<div style="width:100%;padding:.3rem .2rem"><p style="font-weight:600;margin-bottom:.4rem">Nessun dato trovato per <code>${esc(isbn)}</code></p>${rows?`<ul style="font-size:.82rem;color:var(--ink-muted);margin:0 0 .55rem 1.1rem;line-height:1.5">${rows}</ul>`:''}${quota?'<p style="font-size:.85rem;color:var(--ink-light);font-family:var(--font-body)">La quota condivisa di ricerca è satura. Aggiungi una <strong>chiave gratuita Google Books</strong> in <em>Backup → Ricerca ISBN</em> per risultati affidabili su quasi ogni libro.</p>':'<p style="font-size:.85rem;color:var(--ink-light);font-family:var(--font-body)">Il libro potrebbe non essere nei cataloghi online: compila i campi a mano e salva.</p>'}</div>`;
+    toast('ISBN non trovato nei cataloghi','error');
+}
+
+// Catena di fonti. Ritorna {data, log:[{source,status}]}; data=null se nessuna fonte ha il libro.
 async function resolveISBN(isbn){
-    // 1) Google Books — ottima copertura italiana, copertina inclusa
+    const log=[]; const key=getGBooksKey();
+    // 1) Google Books (con chiave gratuita se impostata, altrimenti quota condivisa)
     try{
-        const gr=await fetchT(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&country=IT&maxResults=1`,9000);
-        if(gr.ok){const gd=await gr.json();if(gd.items&&gd.items.length){const vi=gd.items[0].volumeInfo;const thumb=vi.imageLinks?(vi.imageLinks.thumbnail||vi.imageLinks.smallThumbnail||''):'';const catMap=mapGoogleCategory(vi.categories);return{title:vi.title||'',author:(vi.authors||[]).join(', '),publisher:vi.publisher||'',year:vi.publishedDate?parseInt((vi.publishedDate.match(/\d{4}/)||[])[0])||null:null,pages:vi.pageCount||null,isbn,cover:getBestCover(isbn,null,thumb),category:catMap.category,subcategory:catMap.subcategory,source:'Google Books',language:vi.language||''};}}
-    }catch(e){ if(e.message!=='TIMEOUT'&&isRestricted()) throw e; }
-    // 2) Open Library — scheda dettagliata
+        const url=`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&country=IT&maxResults=1`+(key?`&key=${encodeURIComponent(key)}`:'');
+        const r=await fetchT(url,7000);
+        if(r.status===429){ log.push({source:'Google Books',status:key?'quota della chiave esaurita':'quota condivisa esaurita'}); }
+        else if(r.ok){ const j=await r.json(); if(j.items&&j.items.length){ log.push({source:'Google Books',status:'trovato'}); return {data:fromGoogle(j.items[0].volumeInfo,isbn),log}; } log.push({source:'Google Books',status:'non trovato'}); }
+        else { log.push({source:'Google Books',status:'HTTP '+r.status}); }
+    }catch(e){ log.push({source:'Google Books',status:e.message==='TIMEOUT'?'timeout':'rete bloccata'}); if(e.message!=='TIMEOUT'&&isRestricted()) throw Object.assign(new Error('restricted'),{log}); }
+    // 2) Open Library — jscmd=data (autori + copertina diretti)
     try{
-        const or1=await fetchT(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=details`,9000);
-        if(or1.ok){const od=await or1.json();const rec=od[`ISBN:${isbn}`];if(rec&&rec.details){const d=rec.details;return{title:d.title||'',author:(d.authors||[]).map(a=>a.name).join(', '),publisher:(d.publishers||[])[0]||'',year:d.publish_date?parseInt((d.publish_date.match(/\d{4}/)||[])[0])||null:null,pages:d.number_of_pages||null,isbn,cover:getBestCover(isbn,(d.covers&&d.covers[0])||null,null),category:'',subcategory:'',source:'Open Library',language:(d.languages&&d.languages[0]&&d.languages[0].key)?d.languages[0].key.split('/').pop():''};}}
-    }catch(e){ console.warn('OL details:',e.message); }
+        const r=await fetchT(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,7000);
+        if(r.ok){ const j=await r.json(); const rec=j['ISBN:'+isbn]; if(rec&&rec.title){ log.push({source:'Open Library',status:'trovato'}); return {data:fromOLData(rec,isbn),log}; } log.push({source:'Open Library',status:'non trovato'}); }
+        else log.push({source:'Open Library',status:'HTTP '+r.status});
+    }catch(e){ log.push({source:'Open Library',status:e.message==='TIMEOUT'?'timeout':'errore'}); }
     // 3) Open Library — ricerca
     try{
-        const or2=await fetchT(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1`,9000);
-        if(or2.ok){const d2=await or2.json();if(d2.docs&&d2.docs.length){const doc=d2.docs[0];return{title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',source:'Open Library',language:(doc.language&&doc.language[0])||''};}}
-    }catch(e){ console.warn('OL search:',e.message); }
-    return null;
+        const r=await fetchT(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1&fields=title,author_name,publisher,first_publish_year,number_of_pages_median,cover_i,language`,7000);
+        if(r.ok){ const j=await r.json(); if(j.docs&&j.docs.length){ log.push({source:'Ricerca OL',status:'trovato'}); return {data:fromOLSearch(j.docs[0],isbn),log}; } log.push({source:'Ricerca OL',status:'non trovato'}); }
+        else log.push({source:'Ricerca OL',status:'HTTP '+r.status});
+    }catch(e){ log.push({source:'Ricerca OL',status:e.message==='TIMEOUT'?'timeout':'errore'}); }
+    return {data:null,log};
+}
+function fromGoogle(vi,isbn){const thumb=vi.imageLinks?(vi.imageLinks.thumbnail||vi.imageLinks.smallThumbnail||''):'';const m=mapGoogleCategory(vi.categories);return{title:vi.title||'',author:(vi.authors||[]).join(', '),publisher:vi.publisher||'',year:vi.publishedDate?parseInt((vi.publishedDate.match(/\d{4}/)||[])[0])||null:null,pages:vi.pageCount||null,isbn,cover:getBestCover(isbn,null,thumb),category:m.category,subcategory:m.subcategory,source:'Google Books',language:vi.language||''};}
+function fromOLData(rec,isbn){const cv=rec.cover?(rec.cover.large||rec.cover.medium||rec.cover.small||''):'';return{title:rec.title||'',author:(rec.authors||[]).map(a=>a.name).join(', '),publisher:(rec.publishers||[]).map(p=>p.name).join(', '),year:rec.publish_date?parseInt((rec.publish_date.match(/\d{4}/)||[])[0])||null:null,pages:rec.number_of_pages||null,isbn,cover:cv||olCover(isbn),category:'',subcategory:'',source:'Open Library',language:''};}
+function fromOLSearch(doc,isbn){return{title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',source:'Open Library',language:(doc.language&&doc.language[0])||''};}
+
+// Impostazioni ricerca (scheda Backup)
+function loadGBooksKey(){const el=document.getElementById('gbooks-key');if(el)el.value=getGBooksKey();}
+function saveGBooksKey(){const el=document.getElementById('gbooks-key');const v=el?el.value.trim():'';setGBooksKey(v);toast(v?'Chiave salvata su questo dispositivo':'Chiave rimossa','success');}
+async function testSearch(){
+    const el=document.getElementById('search-test-result');if(!el)return;
+    el.innerHTML='<span class="spinner" style="border-top-color:var(--accent);border-color:var(--accent-border)"></span> Provo la ricerca…';
+    try{
+        const {data,log}=await resolveISBN('9788845296390'); // Il Nome della Rosa (di norma solo Google lo ha)
+        const det=(log||[]).map(l=>`${l.source}: ${l.status}`).join(' · ');
+        el.innerHTML=data?`<span style="color:var(--success);font-weight:700">&#10003; Funziona</span> — «${esc(data.title)}» via ${esc(data.source)}.<br><span style="color:var(--ink-muted);font-size:.8rem">${esc(det)}</span>`:`<span style="color:var(--danger);font-weight:700">Test non trovato.</span> <span style="color:var(--ink-muted);font-size:.8rem">${esc(det)}</span><br><span style="font-size:.84rem">Aggiungi una chiave Google Books per coprire questo libro.</span>`;
+    }catch(e){ el.innerHTML='<span style="color:var(--danger)">Errore di rete nel test (o anteprima con rete bloccata).</span>'; }
 }
 function showISBNResult(data,applied=true){
     const pv=document.getElementById('isbn-preview');
@@ -1164,39 +1219,39 @@ function applyISBNData(silent=false){
 // ════════════════════════════════════════════════════════════════
 //  SCANNER
 // ════════════════════════════════════════════════════════════════
-// Doppio motore: BarcodeDetector nativo (Chrome/Android) + ZXing (Apache-2.0, libero) come fallback affidabile (iOS Safari, Firefox, browser vecchi).
+// ── SCANNER (strumento separato: il suo unico compito è produrre un ISBN valido) ──
+// Motore 1: BarcodeDetector nativo (Android/Chrome). Motore 2: ZXing (Apache-2.0) per iOS/Safari/Firefox.
+// In più, nel modale c'è sempre un campo per digitare l'ISBN: percorso garantito anche senza fotocamera.
 let scanStream=null, scanRAF=null, scanDetector=null, scanMode='', scanLastCode='', scanLastTime=0, zxingReader=null, zxingControls=null, scanTrack=null;
 
-function openScannerModal(){openModal('modal-scanner');checkCameraAndStart()}
-function closeScannerModal(){stopScanner();closeModal('modal-scanner')}
+function setDebug(t){const d=document.getElementById('scanner-debug');if(d)d.textContent=t||'';}
+function openScannerModal(){openModal('modal-scanner');const mi=document.getElementById('scanner-manual-input');if(mi)mi.value='';checkCameraAndStart();}
+function closeScannerModal(){stopScanner();closeModal('modal-scanner');}
 
 async function checkCameraAndStart(){
     const status=document.getElementById('scanner-status'),vp=document.getElementById('scanner-viewport');
     vp.querySelectorAll('video,canvas').forEach(el=>el.remove());
-    setTorchButton(false);
-    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status.innerHTML=msgBox('warn','Fotocamera non supportata da questo browser.');vp.style.display='none';return}
+    setTorchButton(false);setDebug('');
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status.innerHTML=msgBox('warn','Fotocamera non disponibile in questo browser. Usa il campo «digita l\'ISBN» qui sotto.');vp.style.display='none';return;}
     vp.style.display='block';
-    // 1) BarcodeDetector nativo: rapido e preciso su Android/Chrome
     if('BarcodeDetector' in window){
         try{
             const formats=await window.BarcodeDetector.getSupportedFormats();
             if(formats.includes('ean_13')||formats.includes('ean_8')){ await startNativeScanner(status,vp); return; }
-        }catch(e){/* prosegui col fallback */}
+        }catch(e){/* fallback */}
     }
-    // 2) Fallback ZXing (iOS Safari, Firefox, ecc.)
     startZxingScanner(status,vp);
 }
 
 async function startNativeScanner(status,vp){
     scanMode='native';
-    status.textContent='Avvio fotocamera…';
+    status.textContent='Avvio fotocamera…'; setDebug('Motore: nativo (BarcodeDetector)');
     let stream;
     try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}); }
-    catch(e){ vp.style.display='none'; status.innerHTML=isRestricted()?msgBox('warn','Scanner non disponibile in anteprima. Apri Pinakes in una scheda normale (https) per usare la fotocamera.'):msgBox('err','Permesso fotocamera negato. Consenti l\'accesso e riprova.'); scanMode=''; return; }
-    scanStream=stream;
-    scanTrack=stream.getVideoTracks()[0]||null;
+    catch(e){ onCamFail(status,vp); return; }
+    scanStream=stream; scanTrack=stream.getVideoTracks()[0]||null;
     const video=document.createElement('video');
-    video.setAttribute('playsinline','');video.muted=true;video.srcObject=stream;
+    video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;video.srcObject=stream;
     vp.insertBefore(video,vp.firstChild);
     await video.play().catch(()=>{});
     setupTorch();
@@ -1213,16 +1268,30 @@ async function startNativeScanner(status,vp){
     scanRAF=requestAnimationFrame(tick);
 }
 
-function startZxingScanner(status,vp){
+async function startZxingScanner(status,vp){
     scanMode='zxing';
-    if(typeof ZXing==='undefined'){status.innerHTML=msgBox('warn','Libreria scanner non ancora caricata. Verifica la connessione e ricarica la pagina.');vp.style.display='none';return}
+    if(typeof ZXing==='undefined'){status.innerHTML=msgBox('warn','Libreria scanner non ancora caricata. Ricarica la pagina, o usa il campo «digita l\'ISBN» qui sotto.');vp.style.display='none';return;}
+    status.textContent='Avvio fotocamera…'; setDebug('Motore: ZXing · avvio…');
+    // Permesso + scelta esplicita della fotocamera posteriore (le etichette compaiono solo dopo il permesso)
+    let deviceId;
+    try{
+        const tmp=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+        try{
+            const cams=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+            const rear=cams.find(d=>/back|rear|environment|posteriore|tras|rück/i.test(d.label||''));
+            const chosen=rear||cams[cams.length-1]||{};
+            deviceId=chosen.deviceId;
+            const lbl=chosen.label||'fotocamera';
+            setDebug('Motore: ZXing · '+(lbl.length>30?lbl.slice(0,28)+'…':lbl));
+        }catch(e){}
+        try{ tmp.getTracks().forEach(t=>t.stop()); }catch(e){}
+    }catch(e){ onCamFail(status,vp); return; }
     const video=document.createElement('video');
-    video.setAttribute('playsinline','');video.muted=true;
+    video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;
     vp.insertBefore(video,vp.firstChild);
     const hints=new Map();
     try{hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8]);hints.set(ZXing.DecodeHintType.TRY_HARDER,true);}catch(e){}
     try{ zxingReader=new ZXing.BrowserMultiFormatReader(hints); }catch(e){ zxingReader=new ZXing.BrowserMultiFormatReader(); }
-    status.textContent='Avvio fotocamera…';
     const cb=(result,err,controls)=>{
         if(controls&&!zxingControls)zxingControls=controls;
         if(result){ const t=(result.getText?result.getText():result.text)||''; handleScannedCode(t.replace(/[^0-9Xx]/g,'')); }
@@ -1233,11 +1302,17 @@ function startZxingScanner(status,vp){
         scanTrack=(v&&v.srcObject&&v.srcObject.getVideoTracks)?v.srcObject.getVideoTracks()[0]:null;
         setupTorch();
     };
-    const onFail=()=>{vp.style.display='none';status.innerHTML=isRestricted()?msgBox('warn','Scanner non disponibile in anteprima. Apri Pinakes in una scheda normale (https) per usare la fotocamera.'):msgBox('err','Permesso fotocamera negato o non disponibile. Consenti l\'accesso e riprova.');scanMode='';};
     let p;
-    try{ p=zxingReader.decodeFromConstraints({video:{facingMode:{ideal:'environment'}}},video,cb); }
-    catch(e){ try{ p=zxingReader.decodeFromVideoDevice(undefined,video,cb); }catch(e2){ onFail(); return; } }
-    Promise.resolve(p).then(c=>{ if(c&&c.stop)zxingControls=c; onStarted(); }).catch(onFail);
+    try{ p=zxingReader.decodeFromVideoDevice(deviceId||undefined,video,cb); }
+    catch(e){ try{ p=zxingReader.decodeFromConstraints({video:{facingMode:{ideal:'environment'}}},video,cb); }catch(e2){ onCamFail(status,vp); return; } }
+    Promise.resolve(p).then(c=>{ if(c&&c.stop)zxingControls=c; onStarted(); }).catch(()=>onCamFail(status,vp));
+}
+
+function onCamFail(status,vp){
+    vp.style.display='none'; scanMode=''; setDebug('');
+    status.innerHTML=isRestricted()
+        ? msgBox('warn','Fotocamera non disponibile in anteprima. Apri Pinakes in una scheda https — oppure usa il campo «digita l\'ISBN» qui sotto.')
+        : msgBox('err','Fotocamera non disponibile o permesso negato. Puoi sempre usare il campo «digita l\'ISBN» qui sotto.');
 }
 
 // Torcia (flash) per ambienti con poca luce, se il dispositivo la espone
@@ -1256,14 +1331,14 @@ async function toggleTorch(){
     catch(e){ toast('Torcia non disponibile su questo dispositivo','info'); }
 }
 
-// Validazione + debounce: accetta solo ISBN (EAN-13 978/979 o ISBN-10), ignora altri codici prodotto e letture spurie.
+// Validazione + debounce: accetta solo ISBN (EAN-13 978/979 o ISBN-10). Lo scanner NON cerca: passa l'ISBN al lookup.
 function handleScannedCode(code){
     if(!code)return false;
-    if(code.length===13&&!/^97[89]/.test(code))return false;
+    if(code.length===13&&!/^97[89]/.test(code)){ setDebug('Letto '+code+' — non è un ISBN libro'); return false; }
     if(code.length!==13&&code.length!==10)return false;
     const now=Date.now();
     if(code===scanLastCode&&now-scanLastTime<2500)return false;
-    if(!isValidISBN(code))return false;
+    if(!isValidISBN(code)){ setDebug('Letto '+code+' — checksum non valido'); return false; }
     scanLastCode=code;scanLastTime=now;
     if(navigator.vibrate){try{navigator.vibrate(60)}catch{}}
     closeScannerModal();
@@ -1272,6 +1347,16 @@ function handleScannedCode(code){
     document.getElementById('isbn-lookup').value=code;
     setTimeout(()=>lookupISBN(true),250);
     return true;
+}
+
+// Percorso manuale garantito (campo dentro il modale scanner)
+function scannerManualSubmit(){
+    const v=normalizeISBN(document.getElementById('scanner-manual-input').value);
+    if(v.length!==10&&v.length!==13){toast('Inserisci un ISBN di 10 o 13 cifre','error');return;}
+    closeScannerModal();
+    openAddModal();
+    document.getElementById('isbn-lookup').value=v;
+    setTimeout(()=>lookupISBN(true),250);
 }
 
 function stopScanner(){
@@ -1286,7 +1371,6 @@ function stopScanner(){
     if(vp)vp.querySelectorAll('video').forEach(v=>{try{if(v.srcObject&&v.srcObject.getTracks)v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;}catch{}v.remove();});
     setTorchButton(false);
 }
-function manualISBNEntry(){const isbn=prompt('Inserisci ISBN:');if(isbn&&isbn.trim()){openAddModal();document.getElementById('isbn-lookup').value=isbn.trim().replace(/[- ]/g,'');setTimeout(()=>lookupISBN(true),250)}}
 function msgBox(type,txt){const bg=type==='err'?'var(--danger-light)':'var(--warning-light)';return`<div style="background:${bg};border-radius:var(--radius);padding:1rem;margin:.5rem 0"><p style="font-size:.88rem;color:var(--ink)">${txt}</p></div>`}
 
 // ════════════════════════════════════════════════════════════════

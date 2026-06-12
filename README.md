@@ -121,9 +121,15 @@ messa online: il modo più semplice è **GitHub Pages**, con deploy automatico a
   Google Fonts) caricate da CDN e messe in cache dal service worker per l'uso offline.
 - Compatibilità scanner: Android/Chrome usa il `BarcodeDetector` nativo; iOS/Safari e Firefox
   usano ZXing. Entrambi i motori filtrano su EAN-13 (978/979) e ISBN-10.
-- Fonti dati 100% libere e senza chiave: **Google Books** (con `country=IT`) e **Open Library**.
-  La quota anonima di Google Books è per-IP e abbondante per l'uso personale; se temporaneamente
-  esaurita, l'app passa automaticamente a Open Library, e in ultima istanza consente l'inserimento
-  manuale. Le copertine sono caricate via https (fix mixed-content) con fallback Open Library.
+- **Scanner e database ISBN sono due strumenti separati**: lo scanner produce solo un ISBN valido
+  (e nel suo modale c'è sempre un campo per digitarlo a mano); il database (`resolveISBN`) lo cerca
+  nelle fonti. La ricerca riporta una **diagnostica per fonte** (trovato / non trovato / quota
+  esaurita / timeout) invece di restare appesa.
+- Fonti dati 100% libere: **Google Books** (`country=IT`) e **Open Library** (`jscmd=data` + ricerca).
+  La quota *anonima* condivisa di Google Books è spesso satura (HTTP 429): per una ricerca affidabile
+  su quasi ogni libro si può impostare una **chiave Google Books gratuita** (1000 query/giorno, nessun
+  costo) in *Backup → Ricerca ISBN*; resta in `localStorage`, solo sul dispositivo. Senza chiave si usa
+  comunque Google keyless + Open Library, poi l'inserimento manuale.
+- Copertine caricate via https (fix mixed-content) con fallback Open Library (`?default=false`).
 - Dopo aver modificato `index.html` o gli asset, **incrementa `SHELL_CACHE`** in `sw.js`
   (es. `pinakes-shell-v1` → `v2`) per forzare l'aggiornamento della cache offline.
