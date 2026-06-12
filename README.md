@@ -17,8 +17,13 @@ editore, copertina…) e propone la sua **segnatura e collocazione ideale**.
 ## Funzionalità
 
 - 📷 **Scanner ISBN** dal telefono — doppio motore: `BarcodeDetector` nativo (Chrome/Android)
-  con fallback automatico a Quagga (iPhone/Safari e browser più vecchi).
-- 🔎 **Lookup ISBN multi-database** — Google Books → Open Library → ricerca OL, con copertine.
+  + **ZXing** (Apache-2.0) come fallback affidabile su iPhone/Safari, Firefox e browser più vecchi.
+  Torcia per ambienti con poca luce, vibrazione alla lettura, filtro anti-codici-non-libro.
+- ⚡ **Schedatura con la sola scansione** — inquadri il codice e l'app riconosce l'ISBN, cerca il
+  libro e **auto-compila** titolo, autore, editore, anno, pagine, lingua, categoria e **copertina**:
+  ti resta solo da controllare la collocazione e salvare.
+- 🔎 **Lookup multi-fonte, libero e gratuito** — Google Books (edizione IT) → Open Library →
+  ricerca Open Library, con copertine. Nessuna chiave API, nessun backend, nessun costo.
 - 🗂️ **Catalogo** — vista griglia/lista, ricerca, filtri (stato, categoria, voto), ordinamento,
   scheda dettaglio, modifica ed eliminazione.
 - 📐 **Collocazione Dewey** — tassonomia a 14 categorie con sottocategorie; genera la
@@ -112,8 +117,13 @@ messa online: il modo più semplice è **GitHub Pages**, con deploy automatico a
 
 ## Note tecniche
 
-- Nessun bundler, nessuna dipendenza da installare: librerie esterne (Chart.js, Quagga,
+- Nessun bundler, nessuna dipendenza da installare: librerie esterne (Chart.js, ZXing,
   Google Fonts) caricate da CDN e messe in cache dal service worker per l'uso offline.
-- Compatibilità scanner: Android/Chrome usa il `BarcodeDetector` nativo; iOS/Safari usa Quagga.
+- Compatibilità scanner: Android/Chrome usa il `BarcodeDetector` nativo; iOS/Safari e Firefox
+  usano ZXing. Entrambi i motori filtrano su EAN-13 (978/979) e ISBN-10.
+- Fonti dati 100% libere e senza chiave: **Google Books** (con `country=IT`) e **Open Library**.
+  La quota anonima di Google Books è per-IP e abbondante per l'uso personale; se temporaneamente
+  esaurita, l'app passa automaticamente a Open Library, e in ultima istanza consente l'inserimento
+  manuale. Le copertine sono caricate via https (fix mixed-content) con fallback Open Library.
 - Dopo aver modificato `index.html` o gli asset, **incrementa `SHELL_CACHE`** in `sw.js`
   (es. `pinakes-shell-v1` → `v2`) per forzare l'aggiornamento della cache offline.

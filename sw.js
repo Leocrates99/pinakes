@@ -5,8 +5,8 @@
    - Librerie/font da CDN (Chart.js, Quagga, Google Fonts): stale-while-revalidate
    - Lookup ISBN (Google Books / Open Library) e copertine: solo rete, mai in cache
    Bump SHELL_CACHE quando cambi index.html o gli asset locali. */
-const SHELL_CACHE = 'pinakes-shell-v4';
-const RUNTIME_CACHE = 'pinakes-runtime-v4';
+const SHELL_CACHE = 'pinakes-shell-v5';
+const RUNTIME_CACHE = 'pinakes-runtime-v5';
 
 const SHELL_ASSETS = [
   './',
@@ -21,7 +21,7 @@ const SHELL_ASSETS = [
 ];
 
 // host le cui risposte servono offline (librerie e font)
-const RUNTIME_HOSTS = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+const RUNTIME_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 // host che devono SEMPRE andare in rete (API e copertine): non sporcano la cache
 const NETWORK_ONLY_HOSTS = [
   'www.googleapis.com', 'openlibrary.org', 'covers.openlibrary.org',

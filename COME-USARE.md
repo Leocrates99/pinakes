@@ -23,12 +23,13 @@ Tre modi, dalla scheda **Catalogo**:
 
 ### A) Con lo scanner (il più veloce) 📷
 1. Tocca **▢ Scanner**.
-2. Inquadra il **codice a barre** sul retro del libro.
-3. Appena riconosciuto l'ISBN, Pinakes apre la scheda già precompilata con titolo, autore,
-   editore, pagine e copertina. Controlla, scegli **categoria** e **stanza/scaffale**, e **Salva**.
+2. Inquadra il **codice a barre** sul retro del libro. Con poca luce, tocca **🔦 Torcia**.
+3. Con la **sola scansione**, Pinakes riconosce l'ISBN, cerca il libro e **compila da solo**
+   titolo, autore, editore, anno, pagine, lingua, categoria e **copertina**. Ti basta controllare
+   **stanza/scaffale** e toccare **Salva**.
 
-> Lo scanner riconosce solo i codici dei libri (ISBN che iniziano con 978/979). I codici di
-> altri prodotti vengono ignorati.
+> Lo scanner riconosce solo i codici dei libri (ISBN 978/979 o ISBN-10): i codici di altri
+> prodotti vengono ignorati. Una piccola vibrazione conferma la lettura.
 
 ### B) Cercando l'ISBN a mano
 1. Tocca **+ Aggiungi**.
@@ -95,7 +96,12 @@ Serve la connessione **https** (o `localhost`) e il permesso fotocamera. Se hai 
 con doppio clic non funziona: usa l'app pubblicata online o `python -m http.server`.
 
 **Su iPhone lo scanner è più lento.**
-Normale: iOS non ha lo scanner nativo e usa Quagga. Tieni il codice ben illuminato e fermo.
+Normale: iOS non ha lo scanner nativo e usa ZXing. Tieni il codice ben illuminato (usa la
+**Torcia**), fermo e a ~15–20 cm. Su Android lo scanner nativo è più rapido.
+
+**Ha scansionato ma dice "ISBN non trovato".**
+Il libro potrebbe non essere nei cataloghi online (edizioni vecchie, locali o senza ISBN), oppure
+la ricerca era momentaneamente satura: l'ISBN resta già scritto, completa i campi a mano e salva.
 
 **Posso usarlo senza internet?**
 Sì, per consultare e gestire la collezione. Serve la rete solo per cercare un **nuovo** ISBN
