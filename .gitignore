@@ -10,3 +10,7 @@ desktop.ini
 # Temporanei
 *.tmp
 *.log
+
+# file di test locali (non parte dell'app)
+_build_test_barcode.py
+barcode_test.png
