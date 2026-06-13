@@ -763,7 +763,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v10';
+const APP_VERSION = '2026-06-12 · v11';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -1271,7 +1271,7 @@ function applyISBNData(silent=false){
 // ── SCANNER (strumento separato: il suo unico compito è produrre un ISBN valido) ──
 // Motore 1: BarcodeDetector nativo (Android/Chrome). Motore 2: ZXing (Apache-2.0) per iOS/Safari/Firefox.
 // In più, nel modale c'è sempre un campo per digitare l'ISBN: percorso garantito anche senza fotocamera.
-let scanStream=null, scanRAF=null, scanDetector=null, scanMode='', scanLastCode='', scanLastTime=0, zxingReader=null, zxingControls=null, scanTrack=null;
+let scanStream=null, scanRAF=null, scanTimer=null, scanDetector=null, scanMode='', scanLastCode='', scanLastTime=0, zxingReader=null, zxingControls=null, scanTrack=null;
 
 function setDebug(t){const d=document.getElementById('scanner-debug');if(d)d.textContent=t||'';}
 function openScannerModal(){openModal('modal-scanner');const mi=document.getElementById('scanner-manual-input');if(mi)mi.value='';checkCameraAndStart();}
@@ -1283,78 +1283,65 @@ async function checkCameraAndStart(){
     setTorchButton(false);setDebug('');
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status.innerHTML=msgBox('warn','Fotocamera non disponibile in questo browser. Usa il campo «digita l\'ISBN» qui sotto.');vp.style.display='none';return;}
     vp.style.display='block';
-    if('BarcodeDetector' in window){
-        try{
-            const formats=await window.BarcodeDetector.getSupportedFormats();
-            if(formats.includes('ean_13')||formats.includes('ean_8')){ await startNativeScanner(status,vp); return; }
-        }catch(e){/* fallback */}
-    }
-    startZxingScanner(status,vp);
+    startLiveScanner(status,vp);
 }
 
-async function startNativeScanner(status,vp){
-    scanMode='native';
-    status.textContent='Avvio fotocamera…'; setDebug('Motore: nativo (BarcodeDetector)');
-    let stream;
-    try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}}); }
-    catch(e){ onCamFail(status,vp); return; }
-    scanStream=stream; scanTrack=stream.getVideoTracks()[0]||null;
-    const video=document.createElement('video');
-    video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;video.srcObject=stream;
-    vp.insertBefore(video,vp.firstChild);
-    await video.play().catch(()=>{});
-    setupTorch();
-    status.textContent='Inquadra il codice a barre sul retro del libro…';
-    scanDetector=new window.BarcodeDetector({formats:['ean_13','ean_8']});
-    const tick=async()=>{
-        if(scanMode!=='native')return;
-        try{
-            const codes=await scanDetector.detect(video);
-            for(const c of (codes||[])){ if(handleScannedCode((c.rawValue||'').replace(/[^0-9Xx]/g,''))) return; }
-        }catch(e){/* frame non pronto */}
-        scanRAF=requestAnimationFrame(tick);
-    };
-    scanRAF=requestAnimationFrame(tick);
-}
-
-async function startZxingScanner(status,vp){
-    scanMode='zxing';
-    if(typeof ZXing==='undefined'){status.innerHTML=msgBox('warn','Libreria scanner non ancora caricata. Ricarica la pagina, o usa il campo «digita l\'ISBN» qui sotto.');vp.style.display='none';return;}
-    status.textContent='Avvio fotocamera…'; setDebug('Motore: ZXing · avvio…');
-    // Permesso + scelta esplicita della fotocamera posteriore (le etichette compaiono solo dopo il permesso)
+// Scanner LIVE unificato: mostra la fotocamera e passa OGNI fotogramma allo STESSO decodificatore della foto
+// (BarcodeDetector nativo se presente, altrimenti ZXing su snapshot del frame). Lettura reale, non animazione finta.
+async function startLiveScanner(status,vp){
+    scanMode='live';
+    status.textContent='Avvio fotocamera…'; setDebug('Avvio fotocamera…');
+    // Permesso + scelta esplicita della fotocamera posteriore
     let deviceId;
     try{
         const tmp=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
         try{
             const cams=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
             const rear=cams.find(d=>/back|rear|environment|posteriore|tras|rück/i.test(d.label||''));
-            const chosen=rear||cams[cams.length-1]||{};
-            deviceId=chosen.deviceId;
-            const lbl=chosen.label||'fotocamera';
-            setDebug('Motore: ZXing · '+(lbl.length>30?lbl.slice(0,28)+'…':lbl));
+            deviceId=(rear||cams[cams.length-1]||{}).deviceId;
         }catch(e){}
         try{ tmp.getTracks().forEach(t=>t.stop()); }catch(e){}
     }catch(e){ onCamFail(status,vp); return; }
+    // Stream definitivo (preferisci il deviceId scelto, in alta risoluzione)
+    let stream;
+    try{
+        const cons=deviceId?{deviceId:{exact:deviceId},width:{ideal:1920},height:{ideal:1080}}:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}};
+        stream=await navigator.mediaDevices.getUserMedia({video:cons});
+    }catch(e){ try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}); }catch(e2){ onCamFail(status,vp); return; } }
+    if(scanMode!=='live'){ try{stream.getTracks().forEach(t=>t.stop());}catch(e){} return; } // modale chiuso nel frattempo
+    scanStream=stream; scanTrack=stream.getVideoTracks()[0]||null;
     const video=document.createElement('video');
-    video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;
+    video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;video.srcObject=stream;
     vp.insertBefore(video,vp.firstChild);
-    const hints=new Map();
-    try{hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8]);hints.set(ZXing.DecodeHintType.TRY_HARDER,true);}catch(e){}
-    try{ zxingReader=new ZXing.BrowserMultiFormatReader(hints); }catch(e){ zxingReader=new ZXing.BrowserMultiFormatReader(); }
-    const cb=(result,err,controls)=>{
-        if(controls&&!zxingControls)zxingControls=controls;
-        if(result){ const t=(result.getText?result.getText():result.text)||''; handleScannedCode(t.replace(/[^0-9Xx]/g,'')); }
+    try{ await video.play(); }catch(e){}
+    setupTorch();
+    // Motore: BarcodeDetector nativo se c'è (legge il <video> direttamente), altrimenti ZXing su snapshot canvas
+    let bd=null;
+    if('BarcodeDetector' in window){ try{ const fmts=await window.BarcodeDetector.getSupportedFormats(); if(fmts.includes('ean_13')) bd=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(f=>fmts.includes(f))}); }catch(e){} }
+    status.textContent='Inquadra il codice a barre — lettura automatica…';
+    const canvas=document.createElement('canvas'); let attempts=0, busy=false;
+    const tick=async()=>{
+        if(scanMode!=='live')return;
+        if(!busy && video.videoWidth && video.videoHeight){
+            busy=true; attempts++;
+            setDebug((bd?'Motore nativo':'Motore ZXing')+' · lettura continua · '+attempts);
+            try{
+                let code=null;
+                if(bd){
+                    const res=await bd.detect(video);
+                    if(res&&res.length){ code=res.map(r=>(r.rawValue||'').replace(/\D/g,'')).find(v=>/^(97[89]\d{10})$/.test(v))||(res[0].rawValue||'').replace(/[^0-9Xx]/g,''); }
+                }else{
+                    const cw=Math.min(1280,video.videoWidth), s=cw/video.videoWidth, ch=Math.round(video.videoHeight*s);
+                    canvas.width=cw; canvas.height=ch; canvas.getContext('2d').drawImage(video,0,0,cw,ch);
+                    code=await zxingDecodeURL(canvas.toDataURL('image/jpeg',0.7));
+                }
+                if(code && handleScannedCode(normalizeISBN(code))) return; // successo → chiude il modale e cerca
+            }catch(e){}
+            busy=false;
+        }
+        scanTimer=setTimeout(tick, bd?120:280);
     };
-    const onStarted=()=>{
-        status.textContent='Inquadra il codice a barre sul retro del libro…';
-        const v=vp.querySelector('video');
-        scanTrack=(v&&v.srcObject&&v.srcObject.getVideoTracks)?v.srcObject.getVideoTracks()[0]:null;
-        setupTorch();
-    };
-    let p;
-    try{ p=zxingReader.decodeFromVideoDevice(deviceId||undefined,video,cb); }
-    catch(e){ try{ p=zxingReader.decodeFromConstraints({video:{facingMode:{ideal:'environment'}}},video,cb); }catch(e2){ onCamFail(status,vp); return; } }
-    Promise.resolve(p).then(c=>{ if(c&&c.stop)zxingControls=c; onStarted(); }).catch(()=>onCamFail(status,vp));
+    scanTimer=setTimeout(tick,250);
 }
 
 function onCamFail(status,vp){
@@ -1512,6 +1499,7 @@ async function decodePhoto(e){
 function stopScanner(){
     scanMode='';
     if(scanRAF){cancelAnimationFrame(scanRAF);scanRAF=null}
+    if(scanTimer){clearTimeout(scanTimer);scanTimer=null}
     scanDetector=null;
     if(zxingControls){try{zxingControls.stop()}catch{}zxingControls=null}
     if(zxingReader){try{if(zxingReader.reset)zxingReader.reset()}catch{}zxingReader=null}
