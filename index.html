@@ -704,6 +704,7 @@
             <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.7rem;flex-wrap:wrap">
                 <button class="btn btn-primary" onclick="document.getElementById('scanner-photo').click()">&#128247; Scatta foto del codice</button>
                 <button class="btn btn-brand-soft" id="scanner-torch" onclick="toggleTorch()" style="display:none">&#128294; Torcia</button>
+                <button class="btn btn-outline" onclick="testDecoderInScanner()">&#129514; Prova decodificatore</button>
                 <button class="btn btn-outline" onclick="closeScannerModal()">Chiudi</button>
             </div>
             <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--parchment-dark);text-align:left">
@@ -762,7 +763,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v9';
+const APP_VERSION = '2026-06-12 · v10';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -1226,6 +1227,8 @@ async function runDiagnostics(){
     // Copertina
     try{ await loadImg('https://covers.openlibrary.org/b/id/240727-S.jpg'); L.push('Copertine: OK'); }
     catch(e){ L.push('Copertine: bloccate'); }
+    // Decodificatore barcode (genera un EAN-13 noto e prova a rileggerlo)
+    try{ L.push('Decodificatore: '+await selfTestDecoder()); }catch(e){ L.push('Decodificatore: errore'); }
     const anyBlocked=L.some(x=>/BLOCCAT|NON caricato|non registrato/i.test(x));
     el.innerHTML='<pre style="white-space:pre-wrap;font-family:var(--font-mono);font-size:.78rem;background:var(--parchment);border:1px solid var(--parchment-dark);border-radius:var(--radius);padding:.7rem;line-height:1.5;overflow-x:auto">'+esc(L.join('\n'))+'</pre>'+(anyBlocked?'<p style="font-size:.85rem;color:var(--danger);margin-top:.4rem">Qualcosa è bloccato: probabile un <strong>blocco contenuti/privacy</strong>, un <strong>browser in-app</strong> o una rete che filtra. Apri Pinakes in Safari/Chrome normale, senza blocco-pubblicità, e riprova.</p>':'<p style="font-size:.85rem;color:var(--success);margin-top:.4rem">Connessione ai database OK. Se un libro non si trova, è una questione di copertura: imposta la chiave Google Books.</p>');
 }
@@ -1405,34 +1408,91 @@ function scannerManualSubmit(){
     setTimeout(()=>lookupISBN(true),250);
 }
 
-// Lettura da FOTO: scatto ad alta risoluzione, poi decodifica (BarcodeDetector → ZXing). Più affidabile del video.
+// ── DECODIFICATORE: generatore EAN-13 (per auto-test) + lettura foto robusta ──
 function loadImg(url){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('img'));i.src=url;});}
-async function decodeImageURL(url){
-    // 1) BarcodeDetector sull'immagine
-    if('BarcodeDetector' in window){
-        try{
-            const fmts=await window.BarcodeDetector.getSupportedFormats();
-            if(fmts.includes('ean_13')){
-                const det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(f=>fmts.includes(f))});
-                const img=await loadImg(url);
-                const res=await det.detect(img);
-                if(res&&res.length){
-                    const ean=res.map(r=>(r.rawValue||'').replace(/\D/g,'')).find(v=>/^(97[89]\d{10})$/.test(v));
-                    return ean||res.map(r=>(r.rawValue||'').replace(/[^0-9Xx]/g,'')).find(Boolean)||null;
-                }
-            }
-        }catch(e){/* passa a ZXing */}
-    }
-    // 2) ZXing sull'immagine
-    if(typeof ZXing!=='undefined'){
-        try{
-            const hints=new Map();
-            try{hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);hints.set(ZXing.DecodeHintType.TRY_HARDER,true);}catch(e){}
-            const reader=new ZXing.BrowserMultiFormatReader(hints);
-            const r=await reader.decodeFromImageUrl(url);
-            try{reader.reset&&reader.reset();}catch(e){}
-            if(r){return ((r.getText?r.getText():r.text)||'').replace(/[^0-9Xx]/g,'');}
-        }catch(e){/* nessun codice */}
+// Genera un barcode EAN-13 su canvas (serve per testare il motore di decodifica sul dispositivo)
+function ean13Bits(code){
+    const L=['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+    const G=['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+    const R=['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+    const P=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+    const d=code.split('').map(Number); let bits='101'; const p=P[d[0]];
+    for(let i=0;i<6;i++) bits+=(p[i]==='L'?L:G)[d[1+i]];
+    bits+='01010';
+    for(let i=0;i<6;i++) bits+=R[d[7+i]];
+    return bits+'101';
+}
+function makeEAN13Canvas(code,scale,h){
+    scale=scale||3; h=h||160; const bits=ean13Bits(code); const quiet=12;
+    const c=document.createElement('canvas'); c.width=(bits.length+quiet*2)*scale; c.height=h;
+    const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.fillStyle='#000';
+    let x=quiet*scale; for(const b of bits){ if(b==='1')ctx.fillRect(x,0,scale,h); x+=scale; }
+    return c;
+}
+async function zxingDecodeURL(url){
+    if(typeof ZXing==='undefined')return null;
+    try{
+        const hints=new Map();
+        try{hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);hints.set(ZXing.DecodeHintType.TRY_HARDER,true);}catch(e){}
+        const reader=new ZXing.BrowserMultiFormatReader(hints);
+        const r=await reader.decodeFromImageUrl(url);
+        try{reader.reset&&reader.reset();}catch(e){}
+        return r?(((r.getText?r.getText():r.text)||'').replace(/[^0-9Xx]/g,'')):null;
+    }catch(e){ return null; }
+}
+async function detectBitmap(src){ // BarcodeDetector su immagine/canvas (se disponibile)
+    if(!('BarcodeDetector' in window))return null;
+    try{
+        const fmts=await window.BarcodeDetector.getSupportedFormats();
+        if(!fmts.includes('ean_13'))return null;
+        const det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(f=>fmts.includes(f))});
+        const res=await det.detect(src);
+        if(res&&res.length){ const ean=res.map(r=>(r.rawValue||'').replace(/\D/g,'')).find(v=>/^(97[89]\d{10})$/.test(v)); return ean||(res[0].rawValue||'').replace(/[^0-9Xx]/g,'')||null; }
+    }catch(e){}
+    return null;
+}
+// Auto-test: genera un EAN-13 noto (978-3-16-148410-0) e prova a rileggerlo. Dice se il motore funziona sul dispositivo.
+async function selfTestDecoder(){
+    try{
+        const c=makeEAN13Canvas('9783161484100',3,160);
+        const bd=await detectBitmap(c); if(bd==='9783161484100')return 'OK (nativo)';
+        const zx=await zxingDecodeURL(c.toDataURL('image/png')); if(zx==='9783161484100')return 'OK (ZXing)';
+        return (bd||zx)?('letto '+(bd||zx)):'FALLITO';
+    }catch(e){ return 'errore'; }
+}
+async function testDecoderInScanner(){
+    setDebug('Auto-test del decodificatore…');
+    const r=await selfTestDecoder();
+    const ok=/^OK/.test(r);
+    setDebug('Decodificatore: '+r);
+    toast(ok?'Decodificatore OK — il motore legge i codici su questo dispositivo':'Decodificatore: '+r+' (riferiscimelo)',ok?'success':'error');
+}
+// Lettura FOTO robusta: orientamento EXIF + 4 rotazioni (le foto iPhone sono spesso ruotate).
+async function fileToCanvas(file,maxDim){
+    let bmp,tmpUrl;
+    try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }
+    catch(e){ tmpUrl=URL.createObjectURL(file); bmp=await loadImg(tmpUrl); }
+    const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight;
+    const s=Math.min(1,(maxDim||1600)/Math.max(w,h));
+    const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*s)); c.height=Math.max(1,Math.round(h*s));
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    if(bmp.close){try{bmp.close()}catch(e){}}
+    if(tmpUrl)URL.revokeObjectURL(tmpUrl);
+    return c;
+}
+function rotateCanvas(src,deg){
+    if(deg%360===0)return src;
+    const c=document.createElement('canvas');
+    if(deg%180===0){c.width=src.width;c.height=src.height;}else{c.width=src.height;c.height=src.width;}
+    const ctx=c.getContext('2d'); ctx.translate(c.width/2,c.height/2); ctx.rotate(deg*Math.PI/180); ctx.drawImage(src,-src.width/2,-src.height/2);
+    return c;
+}
+async function decodeImageFile(file){
+    const base=await fileToCanvas(file,1600);
+    const bd=await detectBitmap(base); if(bd)return bd; // BarcodeDetector gestisce già le rotazioni
+    for(const deg of [0,90,270,180]){
+        const code=await zxingDecodeURL(rotateCanvas(base,deg).toDataURL('image/jpeg',0.92));
+        if(code)return code;
     }
     return null;
 }
@@ -1440,15 +1500,13 @@ async function decodePhoto(e){
     const file=e.target.files&&e.target.files[0]; e.target.value='';
     if(!file)return;
     const status=document.getElementById('scanner-status'); if(status)status.textContent='Leggo la foto…'; setDebug('Decodifica foto…');
-    const url=URL.createObjectURL(file);
     try{
-        const code=await decodeImageURL(url);
-        if(code&&handleScannedCode(normalizeISBN(code))) return; // ok: chiude e cerca
-        if(code){ setDebug('Letto '+code+' — non è un ISBN valido'); toast('Codice letto ma non è un ISBN valido. Riprova o digita l\'ISBN.','error'); }
-        else { setDebug(''); toast('Nessun codice riconosciuto nella foto. Avvicina, metti a fuoco e riempi l\'inquadratura — oppure digita l\'ISBN.','error'); }
-        if(status)status.textContent='Inquadra il codice, scatta una foto, oppure digita l\'ISBN.';
-    }catch(err){ if(status)status.textContent='Inquadra il codice o digita l\'ISBN.'; toast('Non sono riuscito a leggere la foto. Digita l\'ISBN qui sotto.','error'); }
-    finally{ URL.revokeObjectURL(url); }
+        const code=await decodeImageFile(file);
+        if(code&&handleScannedCode(normalizeISBN(code))) return;
+        if(code){ setDebug('Letto '+code+' — non è un ISBN'); toast('Codice letto ('+code+') ma non è un ISBN. Riprova o digita l\'ISBN.','error'); }
+        else { setDebug('Foto: nessun codice riconosciuto'); toast('Nessun codice riconosciuto. Riprova con il codice ben a fuoco, dritto e che riempia il riquadro — oppure digita l\'ISBN.','error'); }
+        if(status)status.textContent='Riprova la foto, oppure digita l\'ISBN qui sotto.';
+    }catch(err){ if(status)status.textContent='Digita l\'ISBN qui sotto.'; setDebug('Errore foto'); toast('Non sono riuscito a leggere la foto. Digita l\'ISBN.','error'); }
 }
 
 function stopScanner(){
