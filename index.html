@@ -17,7 +17,8 @@
     <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"></noscript>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <style>
@@ -484,6 +485,33 @@
         /* Modali: bordo e ombra più morbidi */
         .modal-box{border:1px solid var(--parchment-dark);box-shadow:0 18px 50px rgba(44,53,57,.18)}
         [data-theme="dark"] .modal-box{box-shadow:0 18px 50px rgba(0,0,0,.55)}
+
+        /* ═══════════════════════════════════════════════════════════
+           SCANNER AL CENTRO — hero di scansione + pulsante flottante
+           ═══════════════════════════════════════════════════════════ */
+        .scan-hero{display:flex;align-items:center;gap:1.1rem;background:var(--accent-pale);border:1px solid var(--accent-border);border-radius:var(--radius-lg);padding:1.05rem 1.3rem;margin-bottom:1.3rem;flex-wrap:wrap}
+        .scan-hero-icon{font-size:1.9rem;line-height:1;flex-shrink:0}
+        .scan-hero-text{flex:1;min-width:200px}
+        .scan-hero-text h3{font-family:var(--font-display);font-size:1.3rem;font-weight:700;letter-spacing:-.01em;color:var(--ink);margin:0 0 .15rem}
+        .scan-hero-text p{font-family:var(--font-body);font-size:.92rem;line-height:1.5;color:var(--ink-light);margin:0}
+        .scan-hero-actions{display:flex;gap:.55rem;flex-wrap:wrap}
+        .btn-lg{padding:.8rem 1.5rem;font-size:1rem}
+        @media(max-width:640px){.scan-hero{padding:1rem;gap:.75rem}.scan-hero-icon{display:none}.scan-hero-actions{width:100%}.scan-hero-actions .btn{flex:1;justify-content:center}}
+
+        /* Pulsante flottante "Scansiona" — azione primaria sempre raggiungibile */
+        .fab-scan{position:fixed;bottom:1.5rem;right:1.5rem;z-index:850;display:inline-flex;align-items:center;gap:.5rem;height:54px;padding:0 1.35rem;border-radius:999px;background:var(--accent);color:#fff;border:none;font:600 .95rem/1 var(--font-ui);cursor:pointer;box-shadow:0 10px 26px rgba(24,0,172,.32);transition:var(--transition)}
+        .fab-scan:hover{background:var(--accent-light);transform:translateY(-2px);box-shadow:0 14px 30px rgba(24,0,172,.4)}
+        .fab-scan .fab-ic{font-size:1.2rem}
+        [data-theme="dark"] .fab-scan{box-shadow:0 10px 26px rgba(0,0,0,.5)}
+        @media(max-width:768px){.fab-scan{bottom:1rem;right:1rem}}
+        @media(max-width:380px){.fab-scan .fab-tx{display:none}.fab-scan{padding:0;width:54px;justify-content:center}}
+        @media print{.fab-scan{display:none!important}}
+
+        /* Contatore risultati nel catalogo */
+        .catalog-count{font-family:var(--font-ui);font-size:.78rem;font-weight:600;letter-spacing:.04em;color:var(--ink-muted);white-space:nowrap}
+
+        /* Pillole statistiche: icona + valore display */
+        .stat-pill .lbl{display:inline-flex;align-items:center;gap:.25rem;justify-content:center}
     </style>
 </head>
 <body>
@@ -496,11 +524,11 @@
             </div>
         </div>
         <div class="header-stats">
-            <div class="stat-pill"><span class="num" id="h-total">0</span><span class="lbl">Libri</span></div>
-            <div class="stat-pill"><span class="num" id="h-read">0</span><span class="lbl">Letti</span></div>
-            <div class="stat-pill"><span class="num" id="h-year">0</span><span class="lbl">Quest'anno</span></div>
-            <div class="stat-pill"><span class="num" id="h-reading">0</span><span class="lbl">In Corso</span></div>
-            <div class="stat-pill"><span class="num" id="h-pages">0</span><span class="lbl">Pagine</span></div>
+            <div class="stat-pill"><span class="num" id="h-total">0</span><span class="lbl">&#128218; Libri</span></div>
+            <div class="stat-pill"><span class="num" id="h-read">0</span><span class="lbl">&#10003; Letti</span></div>
+            <div class="stat-pill"><span class="num" id="h-year">0</span><span class="lbl">&#128197; Quest'anno</span></div>
+            <div class="stat-pill"><span class="num" id="h-reading">0</span><span class="lbl">&#128214; In Corso</span></div>
+            <div class="stat-pill"><span class="num" id="h-pages">0</span><span class="lbl">&#128196; Pagine</span></div>
         </div>
     </div>
 </header>
@@ -519,13 +547,22 @@
             <h2 class="panel-title">Catalogo</h2>
             <p class="panel-lead">Tutti i volumi che possiedi: cerca, filtra e ordina la tua biblioteca.</p>
         </div>
+        <div class="scan-hero">
+            <div class="scan-hero-icon">&#128247;</div>
+            <div class="scan-hero-text">
+                <h3>Registra un libro nuovo</h3>
+                <p>Scansiona il codice a barre: titolo, autore e copertina si compilano da soli.</p>
+            </div>
+            <div class="scan-hero-actions">
+                <button class="btn btn-primary btn-lg" onclick="openScannerModal()">&#128247; Scansiona</button>
+                <button class="btn btn-outline" onclick="openAddModal()">+ A mano</button>
+            </div>
+        </div>
         <div class="toolbar">
             <div class="search-wrap">
                 <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" id="search-input" placeholder="Cerca titolo, autore, ISBN, genere…">
             </div>
-            <button class="btn btn-primary" onclick="openAddModal()">+ Aggiungi</button>
-            <button class="btn btn-brand-soft" onclick="openScannerModal()">&#9641; Scanner</button>
             <div class="view-toggles" style="display:flex;gap:.25rem">
                 <button class="btn-icon active" id="view-grid-btn" onclick="setView('grid')" title="Griglia">&#9638;</button>
                 <button class="btn-icon" id="view-list-btn" onclick="setView('list')" title="Lista">&#9776;</button>
@@ -539,6 +576,7 @@
             <span class="filter-label" style="margin-left:.5rem">Ordina:</span>
             <select class="filter-select" id="sort-field"><option value="dateAdded">Data aggiunta</option><option value="title">Titolo</option><option value="author">Autore</option><option value="year">Anno</option><option value="rating">Valutazione</option><option value="pages">Pagine</option></select>
             <button class="sort-direction" id="sort-dir-btn" onclick="toggleSortDir()">&#8595;</button>
+            <span class="catalog-count" id="catalog-count" style="margin-left:auto"></span>
         </div>
         <div id="books-grid" class="books-grid"></div>
     </section>
@@ -733,6 +771,7 @@
 </div></div>
 
 <div class="toast-container" id="toast-container"></div>
+<button class="fab-scan" onclick="openScannerModal()" aria-label="Scansiona un libro" title="Scansiona un libro"><span class="fab-ic">&#128247;</span><span class="fab-tx">Scansiona</span></button>
 <button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Torna su">&#8679;</button>
 
 <script>
@@ -763,7 +802,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v11';
+const APP_VERSION = '2026-06-12 · v12';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -907,11 +946,26 @@ function getFilteredBooks(){
 // ════════════════════════════════════════════════════════════════
 //  CATALOG RENDER
 // ════════════════════════════════════════════════════════════════
+function updateCatalogCount(n){
+    const el=document.getElementById('catalog-count'); if(!el)return;
+    const total=books.length;
+    el.textContent = (n===total) ? `${total} ${total===1?'libro':'libri'}` : `${n} di ${total} libri`;
+}
+function clearFilters(){
+    ['search-input','filter-status','filter-category','filter-rating'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    renderCatalog();
+}
 function renderCatalog(){
     const grid=document.getElementById('books-grid');
     grid.classList.toggle('list-view',viewMode==='list');
     const filtered=getFilteredBooks();
-    if(!filtered.length){grid.innerHTML='<div class="empty-state"><div class="e-icon">&#128218;</div><p>Nessun libro trovato.</p></div>';return}
+    updateCatalogCount(filtered.length);
+    if(!filtered.length){
+        grid.innerHTML = books.length===0
+            ? '<div class="empty-state"><div class="e-icon">&#128218;</div><p style="font-weight:600;font-size:1.05rem;margin-bottom:.3rem">La tua biblioteca è vuota</p><p style="color:var(--ink-muted);margin-bottom:1.1rem;font-family:var(--font-body)">Inizia registrando il primo libro: inquadra il codice a barre.</p><button class="btn btn-primary btn-lg" onclick="openScannerModal()">&#128247; Scansiona il primo libro</button></div>'
+            : '<div class="empty-state"><div class="e-icon">&#128269;</div><p style="font-weight:600;font-size:1.05rem;margin-bottom:.3rem">Nessun libro corrisponde</p><p style="color:var(--ink-muted);margin-bottom:1.1rem;font-family:var(--font-body)">Prova a cambiare la ricerca o i filtri.</p><button class="btn btn-outline" onclick="clearFilters()">Azzera filtri</button></div>';
+        return;
+    }
     grid.innerHTML=filtered.map(b=>{
         const sc=b.status.toLowerCase().replace(/ /g,'-');
         const stars=Array.from({length:5},(_,i)=>`<span class="${i<(b.rating||0)?'':'empty'}">★</span>`).join('');
