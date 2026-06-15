@@ -11,6 +11,7 @@ desktop.ini
 *.tmp
 *.log
 
-# file di test locali (non parte dell'app)
+# file di test / build locali (non parte dell'app)
 _build_test_barcode.py
 barcode_test.png
+_build_dewey.py
