@@ -600,7 +600,10 @@
         <div class="shelving-section">
             <h3>Archivio di classificazione Dewey</h3>
             <p style="font-family:var(--font-body);color:var(--ink-light);font-size:.95rem;line-height:1.65;margin-bottom:.85rem">Lo schema completo della Classificazione Decimale Dewey (000–999) importato come riferimento di smistamento. Quando confermi l'ISBN di un libro, Pinakes ne ricava il numero Dewey e compone la <strong>segnatura</strong>: <em>numero Dewey + iniziali dell'autore</em> (es. <code>853 ECO</code>).</p>
-            <button class="btn btn-primary" onclick="openDeweyPicker(true)">&#128269; Sfoglia la classificazione Dewey</button>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="openDeweyPicker(true)">&#128269; Sfoglia la classificazione Dewey</button>
+                <button class="btn btn-brand-soft" onclick="backfillDewey()">&#9851; Assegna Dewey ai libri esistenti</button>
+            </div>
         </div>
         <div class="shelving-section">
             <h3>Lo scaffale virtuale</h3>
@@ -626,8 +629,8 @@
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
                 <input type="text" id="shelf-suggest-title" placeholder="Titolo" class="filter-select" style="flex:1;min-width:150px">
                 <input type="text" id="shelf-suggest-author" placeholder="Autore" class="filter-select" style="flex:1;min-width:150px">
-                <select id="shelf-suggest-cat" class="filter-select" onchange="populateSubcatSelect('shelf-suggest-sub',this.value)"></select>
-                <select id="shelf-suggest-sub" class="filter-select"></select>
+                <input type="text" id="shelf-suggest-dewey" placeholder="Dewey (es. 853)" inputmode="decimal" class="filter-select" style="flex:0 0 140px;min-width:120px">
+                <button type="button" class="btn btn-brand-soft" onclick="openDeweyPicker('shelf-suggest-dewey')">&#128269;</button>
                 <button class="btn btn-primary" onclick="showShelfSuggestion()">Calcola</button>
             </div>
             <div id="shelf-suggestion-result"></div>
@@ -833,7 +836,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v13';
+const APP_VERSION = '2026-06-12 · v14';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -878,7 +881,6 @@ function initBackToTop(){ window.addEventListener('scroll',()=>{ document.getEle
 function buildCategorySelects(){
     const opts='<option value="">Seleziona…</option>'+CAT_CODES.map(c=>`<option value="${c}">${TAXONOMY[c].name}</option>`).join('');
     document.getElementById('f-category').innerHTML=opts;
-    document.getElementById('shelf-suggest-cat').innerHTML=opts;
     populateFilterCategories();
 }
 function populateSubcatSelect(selectId,catCode){
@@ -1410,11 +1412,11 @@ function onDeweyInput(){
     if(lab){ const l=deweyLabel(code); lab.innerHTML = code ? (l?('<strong>'+esc(code)+'</strong> · '+esc(deweyPretty(l))):('<strong>'+esc(code)+'</strong> · <span style="color:var(--warning)">codice non riconosciuto</span>')) : 'Numero di classe Dewey (compilato in automatico dall\'ISBN, oppure «Sfoglia»).'; }
     updateAutoLocation();
 }
-// Selettore / archivio Dewey
-let deweyPickToField=true;
-function openDeweyPicker(browseOnly){
-    deweyPickToField=!browseOnly;
-    const s=document.getElementById('dewey-search'); s.value=browseOnly?'':(val('f-dewey')||'');
+// Selettore / archivio Dewey. target = id campo da compilare, oppure true/'browse' per sola consultazione.
+let deweyPickTarget='f-dewey';
+function openDeweyPicker(target){
+    deweyPickTarget=(target===true||target==='browse')?'':(target||'f-dewey');
+    const s=document.getElementById('dewey-search'); s.value=deweyPickTarget?(val(deweyPickTarget)||''):'';
     renderDeweyPicker();
     openModal('modal-dewey');
     setTimeout(()=>s.focus(),120);
@@ -1430,8 +1432,10 @@ function renderDeweyPicker(){
     el.innerHTML=list.map(k=>`<div class="dewey-row${k.endsWith('00')?' main':''}" onclick="pickDewey('${k}')"><span class="dewey-code">${k}</span><span class="dewey-name">${esc(deweyPretty(d[k]))}</span></div>`).join('');
 }
 function pickDewey(code){
-    if(deweyPickToField){ const fd=document.getElementById('f-dewey'); if(fd){fd.value=code;onDeweyInput();} closeModal('modal-dewey'); toast('Dewey '+code+' · '+deweyPretty(deweyLabel(code)),'success'); }
-    else { document.getElementById('dewey-search').value=code; renderDeweyPicker(); } // in consultazione: filtra, non chiude
+    if(deweyPickTarget){
+        const fd=document.getElementById(deweyPickTarget); if(fd){ fd.value=code; if(deweyPickTarget==='f-dewey')onDeweyInput(); }
+        closeModal('modal-dewey'); toast('Dewey '+code+' · '+deweyPretty(deweyLabel(code)),'success');
+    } else { document.getElementById('dewey-search').value=code; renderDeweyPicker(); } // consultazione: filtra, non chiude
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1730,32 +1734,68 @@ function renderCharts(){
 //  SHELVING
 // ════════════════════════════════════════════════════════════════
 function getAuthorSurname(a){if(!a)return'';const p=a.trim().split(/\s+/);return p[p.length-1]}
+// Colori per le 10 classi Dewey (l'800 Letteratura eredita il cremisi del brand)
+const DEWEY_COLORS={'000':'#607d8b','100':'#7e57c2','200':'#5d4037','300':'#1565c0','400':'#00838f','500':'#2e7d32','600':'#00838f','700':'#c2185b','800':'#a22e37','900':'#1d3557'};
+function litBase(lang){const m={it:'85',ita:'85',en:'82',eng:'82',de:'83',ger:'83',fr:'84',fre:'84',fra:'84',es:'86',spa:'86',pt:'86',la:'87',lat:'87',grc:'88',gre:'88',el:'88'};return m[(lang||'it').toLowerCase()]||'80';}
+// Mappa la vecchia tassonomia (14 categorie) a un numero Dewey, per assegnarlo ai libri esistenti.
+function categoryToDewey(b){
+    const cat=b.category,sub=b.subcategory||'',lang=b.language||'it',base=litBase(lang);
+    switch(cat){
+        case 'NAR': return base+'3';
+        case 'POE': return sub==='06'?(lang==='grc'?'881':'871'):base+'1';
+        case 'TEA': return sub==='06'?(lang==='grc'?'882':'872'):base+'2';
+        case 'SAG': return {'01':'100','02':'150','03':'301','04':'320','05':'330','06':'301','07':'410','08':'809','09':'701','10':'500','11':'070'}[sub]||'080';
+        case 'STO': return {'01':'930','02':'940','03':'909','04':'909','05':'945','06':'909','07':'920','08':'920','09':'910'}[sub]||'900';
+        case 'ART': return {'01':'709','02':'720','03':'770','04':'791','05':'780','06':'780','07':'740','08':'700'}[sub]||'700';
+        case 'SCI': return {'01':'510','02':'530','03':'540','04':'570','05':'610','06':'004','07':'620','08':'520','09':'550','10':'577'}[sub]||'500';
+        case 'MAN': return {'01':'370','02':'413','03':'640','04':'600','05':'641','06':'635','07':'640','08':'796'}[sub]||'640';
+        case 'REL': return {'01':'220','02':'230','03':'181','04':'204','05':'204','06':'292'}[sub]||'200';
+        case 'DIR': return {'01':'346','02':'345','03':'342','04':'341','05':'348'}[sub]||'340';
+        case 'FUM': return '741';
+        case 'VAR': return {'01':'030','02':'050','03':'050','04':'793'}[sub]||'000';
+    }
+    return '';
+}
+function effectiveDewey(b){return b.dewey||categoryToDewey(b)||'';}
+function deweyKey(b){const n=parseFloat(effectiveDewey(b));return isNaN(n)?9999:n;}
 function getSortedShelf(){
     return[...books].sort((a,b)=>{
-        const ca=CAT_CODES.indexOf(a.category),cb=CAT_CODES.indexOf(b.category);
-        const ia=ca>=0?ca:99,ib=cb>=0?cb:99;
-        if(ia!==ib)return ia-ib;
-        const sa=(a.subcategory||'99'),sb=(b.subcategory||'99');
-        if(sa!==sb)return sa.localeCompare(sb);
+        const da=deweyKey(a),db=deweyKey(b);
+        if(da!==db)return da-db;
         const na=getAuthorSurname(a.author).toLowerCase(),nb=getAuthorSurname(b.author).toLowerCase();
         if(na!==nb)return na.localeCompare(nb,'it');
-        return a.title.toLowerCase().localeCompare(b.title.toLowerCase(),'it');
+        return (a.title||'').toLowerCase().localeCompare((b.title||'').toLowerCase(),'it');
     });
+}
+// Assegna in blocco il Dewey ai libri esistenti, ricavandolo da categoria/lingua.
+async function backfillDewey(){
+    const todo=books.filter(b=>!b.dewey);
+    if(!todo.length){toast('Tutti i libri hanno già un codice Dewey','info');return;}
+    const yes=await customConfirm('Assegnare il codice Dewey?',`${todo.length} libri senza Dewey verranno classificati automaticamente dai dati esistenti (categoria e lingua). Potrai correggerli a mano in qualsiasi momento.`,'Assegna');
+    if(!yes)return;
+    let n=0; todo.forEach(b=>{const d=categoryToDewey(b);if(d){b.dewey=d;n++;}});
+    persist();renderCatalog();updateHeaderStats();
+    if(document.getElementById('panel-shelving').classList.contains('active'))renderShelving();
+    toast(`${n} libri classificati con Dewey`,'success');
 }
 function getSpineColor(b){let h=0;const s=b.author+b.title;for(let i=0;i<s.length;i++)h=((h<<5)-h)+s.charCodeAt(i);return SPINE_COLORS[Math.abs(h)%SPINE_COLORS.length]}
 function getSpineHeight(b){return Math.max(60,Math.min(140,50+(b.pages||200)*0.12))}
 
 function renderShelving(){
-    // #11 Room filter
     const roomFilter=document.getElementById('shelf-room-filter').value;
     const sorted=getSortedShelf().filter(b=>!roomFilter||b.room===roomFilter);
     const groups={};
-    sorted.forEach(b=>{const c=b.category||'VAR';if(!groups[c])groups[c]=[];groups[c].push(b)});
+    sorted.forEach(b=>{const d=effectiveDewey(b);const key=d?deweyMainCode(d):'ZZZ';(groups[key]=groups[key]||[]).push(b);});
+    const order=['000','100','200','300','400','500','600','700','800','900','ZZZ'];
     let html='';
-    CAT_CODES.forEach(cat=>{
-        if(!groups[cat]||!groups[cat].length)return;
-        html+=`<div class="shelf-row" data-cat="${cat}"><div class="shelf-category-label" style="background:${TAXONOMY[cat].color}">${TAXONOMY[cat].name}</div><div class="shelf-scroll-wrap"><div class="shelf-books">`;
-        groups[cat].forEach(b=>{
+    order.forEach(key=>{
+        const arr=groups[key]; if(!arr||!arr.length)return;
+        const isNone=key==='ZZZ';
+        const color=isNone?'#9e9e9e':(DEWEY_COLORS[key]||'#777');
+        let label=isNone?'Senza collocazione':(key+' '+deweyPretty(deweyLabel(key)));
+        if(label.length>24)label=label.slice(0,23)+'…';
+        html+=`<div class="shelf-row" data-cls="${key}"><div class="shelf-category-label" style="background:${color}">${esc(label)}</div><div class="shelf-scroll-wrap"><div class="shelf-books">`;
+        arr.forEach(b=>{
             const col=getSpineColor(b),h=getSpineHeight(b);
             const stDot=b.status.toLowerCase().replace(/ /g,'-');
             html+=`<div class="shelf-book" style="background:${col};height:${h}px" data-id="${b.id}" data-tt-title="${esc(b.title)}" data-tt-author="${esc(b.author)}" data-tt-loc="${esc(generateLocation(b))}"><span class="spine-text">${esc(getAuthorSurname(b.author))}</span><span class="status-dot st-${stDot}"></span></div>`;
@@ -1765,7 +1805,6 @@ function renderShelving(){
     if(!html) html='<div class="empty-state"><div class="e-icon">&#128218;</div><p>Nessun libro in questa stanza.</p></div>';
     document.getElementById('shelving-visual').innerHTML=html;
     initShelfTooltips();
-    populateSubcatSelect('shelf-suggest-sub',document.getElementById('shelf-suggest-cat').value);
 }
 
 // Floating tooltip system
@@ -1813,48 +1852,43 @@ function positionShelfTip(bookEl){
 }
 function hideShelfTip(){if(shelfTip)shelfTip.classList.remove('visible');if(activeShelfBook){activeShelfBook.classList.remove('active');activeShelfBook=null}}
 
-function findShelfPosition(title,author,category,subcategory){
-    const surname=getAuthorSurname(author).toLowerCase();
+function findShelfPositionDewey(title,author,dewey){
     const sorted=getSortedShelf();
-    const same=sorted.filter(b=>(b.category||'')===category&&(b.subcategory||'99')===(subcategory||'99'));
-    if(!same.length)return{position:1,leftNeighbor:null,rightNeighbor:null,total:0,leftId:null,rightId:null};
+    const dk=(function(){const n=parseFloat(dewey);return isNaN(n)?9999:n;})();
+    const surname=getAuthorSurname(author).toLowerCase();
     let idx=0;
-    for(let i=0;i<same.length;i++){
-        const cs=getAuthorSurname(same[i].author).toLowerCase();
-        if(surname<cs){idx=i;break}
-        if(surname===cs&&title.toLowerCase()<same[i].title.toLowerCase()){idx=i;break}
+    for(let i=0;i<sorted.length;i++){
+        const b=sorted[i],bk=deweyKey(b),bs=getAuthorSurname(b.author).toLowerCase();
+        if(dk<bk){idx=i;break}
+        if(dk===bk){ if(surname<bs){idx=i;break} if(surname===bs&&title.toLowerCase()<(b.title||'').toLowerCase()){idx=i;break} }
         idx=i+1;
     }
-    return{position:idx+1,total:same.length,leftNeighbor:idx>0?same[idx-1]:null,rightNeighbor:idx<same.length?same[idx]:null,leftId:idx>0?same[idx-1].id:null,rightId:idx<same.length?same[idx].id:null};
+    return{position:idx+1,total:sorted.length,leftNeighbor:idx>0?sorted[idx-1]:null,rightNeighbor:idx<sorted.length?sorted[idx]:null,leftId:idx>0?sorted[idx-1].id:null,rightId:idx<sorted.length?sorted[idx].id:null};
 }
 
 function showShelfSuggestion(){
-    const title=document.getElementById('shelf-suggest-title').value.trim();
-    const author=document.getElementById('shelf-suggest-author').value.trim();
-    const cat=document.getElementById('shelf-suggest-cat').value;
-    const sub=document.getElementById('shelf-suggest-sub').value||'99';
-    if(!title||!author||!cat){toast('Compila titolo, autore e categoria','error');return}
-    const r=findShelfPosition(title,author,cat,sub);
-    const loc=`${cat}.${sub}.${getAuthorSurname(author).substring(0,3).toUpperCase().padEnd(3,'_')}`;
-    const catName=getCatName(cat),subName=getSubName(cat,sub);
+    const title=val('shelf-suggest-title'),author=val('shelf-suggest-author'),dewey=val('shelf-suggest-dewey');
+    if(!title||!author||!dewey){toast('Compila titolo, autore e numero Dewey','error');return}
+    const r=findShelfPositionDewey(title,author,dewey);
+    const surname=getAuthorSurname(author).substring(0,3).toUpperCase().padEnd(3,'_');
+    const seg=`${dewey} ${surname}`, lbl=deweyLabel(dewey);
     let nh='<div class="suggestion-neighbors">';
-    if(r.leftNeighbor) nh+=`<div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">&#8592; A sinistra</div><strong>${esc(r.leftNeighbor.title)}</strong><br><small>${esc(r.leftNeighbor.author)}</small></div><div class="neighbor-arrow">→</div>`;
-    nh+=`<div class="neighbor-book target"><div style="font-size:.75rem;color:var(--accent)">★ Nuovo</div><strong>${esc(title)}</strong><br><small>${esc(author)}</small></div>`;
-    if(r.rightNeighbor) nh+=`<div class="neighbor-arrow">→</div><div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">A destra &#8594;</div><strong>${esc(r.rightNeighbor.title)}</strong><br><small>${esc(r.rightNeighbor.author)}</small></div>`;
+    if(r.leftNeighbor) nh+=`<div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">&#8592; Prima</div><strong>${esc(r.leftNeighbor.title)}</strong><br><small>${esc(effectiveDewey(r.leftNeighbor))} · ${esc(r.leftNeighbor.author)}</small></div><div class="neighbor-arrow">→</div>`;
+    nh+=`<div class="neighbor-book target"><div style="font-size:.75rem;color:var(--accent)">★ Nuovo</div><strong>${esc(title)}</strong><br><small>${esc(dewey)} · ${esc(author)}</small></div>`;
+    if(r.rightNeighbor) nh+=`<div class="neighbor-arrow">→</div><div class="neighbor-book"><div style="font-size:.75rem;color:var(--ink-muted)">Dopo &#8594;</div><strong>${esc(r.rightNeighbor.title)}</strong><br><small>${esc(effectiveDewey(r.rightNeighbor))} · ${esc(r.rightNeighbor.author)}</small></div>`;
     nh+='</div>';
     document.getElementById('shelf-suggestion-result').innerHTML=`<div class="suggestion-card"><h4>Collocazione consigliata</h4>
-        <p><strong>Sezione:</strong> ${catName}${subName?' — '+subName:''} &nbsp; <strong>Posizione:</strong> ${r.position} di ${r.total+1}</p>
-        <p><strong>Segnatura:</strong> <code style="background:var(--parchment);padding:.2rem .5rem;border-radius:3px;font-size:.95rem">${loc}</code></p>
-        <p style="font-size:.88rem;color:var(--ink-muted);margin-top:.5rem">Ordinamento: categoria → sottocategoria → cognome autore → titolo.
-        ${r.leftNeighbor?`Dopo "${esc(r.leftNeighbor.title)}"`:' Primo della sezione'}${r.rightNeighbor?`, prima di "${esc(r.rightNeighbor.title)}"`:''}.
+        <p><strong>Classe:</strong> ${esc(dewey)}${lbl?' — '+esc(deweyPretty(lbl)):''} &nbsp; <strong>Posizione:</strong> ${r.position} di ${r.total+1}</p>
+        <p><strong>Segnatura:</strong> <code style="background:var(--parchment);padding:.2rem .5rem;border-radius:3px;font-size:.95rem">${esc(seg)}</code></p>
+        <p style="font-size:.88rem;color:var(--ink-muted);margin-top:.5rem">Ordinamento per numero Dewey, poi cognome autore.
+        ${r.leftNeighbor?`Dopo "${esc(r.leftNeighbor.title)}"`:' Primo della raccolta'}${r.rightNeighbor?`, prima di "${esc(r.rightNeighbor.title)}"`:''}.
         </p>${nh}</div>`;
-    // #12 Scroll shelf to highlight neighbors
-    highlightShelfNeighbors(cat,r.leftId,r.rightId);
+    highlightShelfNeighbors(deweyMainCode(dewey),r.leftId,r.rightId);
 }
 
 // #12 Scroll and highlight in shelf
-function highlightShelfNeighbors(cat,leftId,rightId){
-    const row=document.querySelector(`.shelf-row[data-cat="${cat}"]`);
+function highlightShelfNeighbors(cls,leftId,rightId){
+    const row=document.querySelector(`.shelf-row[data-cls="${cls}"]`);
     if(!row)return;
     row.scrollIntoView({behavior:'smooth',block:'center'});
     [leftId,rightId].filter(Boolean).forEach(id=>{
