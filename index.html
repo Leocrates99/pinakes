@@ -521,6 +521,20 @@
         .dewey-row .dewey-name{font-family:var(--font-body);color:var(--ink);line-height:1.35}
         .dewey-row.main .dewey-code,.dewey-row.main .dewey-name{font-weight:700}
         .dewey-bc{font-family:var(--font-mono);font-size:.78rem;color:var(--ink-muted);line-height:1.5}
+        /* Albero Dewey espandibile */
+        .dw-node>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:.5rem;padding:.5rem .6rem;border-bottom:1px solid var(--parchment-dark)}
+        .dw-node>summary::-webkit-details-marker{display:none}
+        .dw-node>summary::before{content:'▸';color:var(--ink-muted);font-size:.7rem;width:1em;flex-shrink:0}
+        .dw-node[open]>summary::before{content:'▾'}
+        .dw-node>summary:hover{background:var(--accent-pale)}
+        .dw-class>summary .dewey-name{font-weight:700}
+        .dw-div{margin-left:1.1rem}
+        .dw-div>summary .dewey-name{font-weight:600}
+        .dewey-row.leaf{margin-left:2.3rem}
+        .dewey-row.leaf:not([onclick]){cursor:default}
+        .dw-pick{margin-left:auto;align-self:center;font:600 .68rem var(--font-ui);background:var(--accent-pale);color:var(--accent);border:1px solid var(--accent-border);border-radius:99px;padding:.12rem .55rem;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
+        .dw-pick:hover{background:var(--accent);color:#fff}
+        .dewey-empty{margin-left:2.3rem;padding:.3rem .6rem;font-size:.8rem;color:var(--ink-muted);font-style:italic}
     </style>
 </head>
 <body>
@@ -836,7 +850,7 @@ const LANG_NAMES = {it:'Italiano',en:'Inglese',fr:'Francese',de:'Tedesco',es:'Sp
 let books = [], editingId = null, isbnCache = {}, sortDir = 'desc', chartInstances = {}, viewMode = 'grid', lastSavedId = null;
 let confirmResolver = null;
 const STORAGE_KEY = 'biblioteca_books_v4';
-const APP_VERSION = '2026-06-12 · v14';
+const APP_VERSION = '2026-06-12 · v15';
 
 // ════════════════════════════════════════════════════════════════
 //  INIT
@@ -921,6 +935,7 @@ function getSubName(cat,sub){return TAXONOMY[cat]?.subs?.[sub]||''}
 // ════════════════════════════════════════════════════════════════
 function deweyData(){return (typeof DEWEY!=='undefined')?DEWEY:{};}
 function deweyLabel(code){const m=(''+(code||'')).match(/\d{3}/);return m?(deweyData()[m[0]]||''):'';}
+function deweyBestLabel(code){const m=(''+(code||'')).match(/\d{3}/);if(!m)return '';const c=m[0],d=deweyData();return d[c]||d[c.slice(0,2)+'0']||d[c[0]+'00']||'';}
 function deweyMainCode(code){const m=(''+(code||'')).match(/\d/);return m?m[0]+'00':'';}
 function deweyDivCode(code){const m=(''+(code||'')).match(/\d\d/);return m?m[0]+'0':'';}
 function deweyPretty(s){if(!s)return '';let t=(''+s).toLowerCase().replace(/a'/g,'à').replace(/e'/g,'è').replace(/i'/g,'ì').replace(/o'/g,'ò').replace(/u'/g,'ù');return t.charAt(0).toUpperCase()+t.slice(1);}
@@ -1119,6 +1134,7 @@ function showDetail(id){
                     ${b.finishedDate?`<div class="detail-info-item"><span class="di-label">Fine</span>${b.finishedDate}</div>`:''}
                     ${b.startedDate&&b.finishedDate?`<div class="detail-info-item"><span class="di-label">Giorni</span>${Math.ceil((new Date(b.finishedDate)-new Date(b.startedDate))/(1000*60*60*24))}</div>`:''}
                 </div>
+                ${(function(){const dw=effectiveDewey(b);if(!dw)return '';const full=deweyFull(dw)||(dw+(deweyBestLabel(dw)?' '+deweyPretty(deweyBestLabel(dw)):''));return `<div style="margin-top:.75rem;background:var(--accent-pale);border:1px solid var(--accent-border);border-radius:var(--radius);padding:.6rem .85rem"><span class="di-label">Classificazione Dewey${b.dewey?'':' (stimata)'}</span><div style="font-family:var(--font-mono);font-size:.82rem;line-height:1.65;color:var(--ink);margin-top:.25rem">${esc(full)}</div></div>`;})()}
                 ${b.notes?`<div class="detail-notes">${esc(b.notes)}</div>`:''}
                 <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap">
                     <button class="btn btn-primary btn-sm" onclick="closeModal('modal-detail');editBook(${b.id})">Modifica</button>
@@ -1281,6 +1297,8 @@ async function lookupISBN(autoApply=false){
     try{
         const {data,log}=await resolveISBN(isbn);
         if(data&&(data.title||data.author)){
+            // Accuratezza: se il Dewey non è quello autorevole del catalogo, prova a recuperarlo da Open Library
+            if(data.deweySource!=='ddc'){ const auth=await enrichDeweyFromOL(isbn); if(auth){ data.dewey=auth; data.deweySource='ddc'; } }
             isbnCache=data;
             if(autoApply) applyISBNData(true);
             showISBNResult(data,autoApply);
@@ -1337,9 +1355,19 @@ async function resolveISBN(isbn){
     return {data:null,log};
 }
 function cleanDewey(d){if(!d)return '';const m=(''+d).match(/\d{1,3}(\.\d+)?/);return m?m[0]:'';}
-function fromGoogle(vi,isbn){const thumb=vi.imageLinks?(vi.imageLinks.thumbnail||vi.imageLinks.smallThumbnail||''):'';const m=mapGoogleCategory(vi.categories);return{title:vi.title||'',author:(vi.authors||[]).join(', '),publisher:vi.publisher||'',year:vi.publishedDate?parseInt((vi.publishedDate.match(/\d{4}/)||[])[0])||null:null,pages:vi.pageCount||null,isbn,cover:getBestCover(isbn,null,thumb),category:m.category,subcategory:m.subcategory,dewey:deweyFromSubjects(vi.categories,vi.language||''),source:'Google Books',language:vi.language||''};}
-function fromOLData(rec,isbn){const cv=rec.cover?(rec.cover.large||rec.cover.medium||rec.cover.small||''):'';const ddc=(rec.classifications&&rec.classifications.dewey_decimal_class&&rec.classifications.dewey_decimal_class[0])||'';const dw=cleanDewey(ddc)||deweyFromSubjects((rec.subjects||[]).map(s=>s.name||s),'');return{title:rec.title||'',author:(rec.authors||[]).map(a=>a.name).join(', '),publisher:(rec.publishers||[]).map(p=>p.name).join(', '),year:rec.publish_date?parseInt((rec.publish_date.match(/\d{4}/)||[])[0])||null:null,pages:rec.number_of_pages||null,isbn,cover:cv||olCover(isbn),category:'',subcategory:'',dewey:dw,source:'Open Library',language:''};}
-function fromOLSearch(doc,isbn){return{title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',dewey:cleanDewey(doc.ddc&&doc.ddc[0])||deweyFromSubjects([doc.subject&&doc.subject[0]],(doc.language&&doc.language[0])||''),source:'Open Library',language:(doc.language&&doc.language[0])||''};}
+function fromGoogle(vi,isbn){const thumb=vi.imageLinks?(vi.imageLinks.thumbnail||vi.imageLinks.smallThumbnail||''):'';const m=mapGoogleCategory(vi.categories);return{title:vi.title||'',author:(vi.authors||[]).join(', '),publisher:vi.publisher||'',year:vi.publishedDate?parseInt((vi.publishedDate.match(/\d{4}/)||[])[0])||null:null,pages:vi.pageCount||null,isbn,cover:getBestCover(isbn,null,thumb),category:m.category,subcategory:m.subcategory,dewey:deweyFromSubjects(vi.categories,vi.language||''),deweySource:'auto',source:'Google Books',language:vi.language||''};}
+function fromOLData(rec,isbn){const cv=rec.cover?(rec.cover.large||rec.cover.medium||rec.cover.small||''):'';const auth=cleanDewey((rec.classifications&&rec.classifications.dewey_decimal_class&&rec.classifications.dewey_decimal_class[0])||'');const dw=auth||deweyFromSubjects((rec.subjects||[]).map(s=>s.name||s),'');return{title:rec.title||'',author:(rec.authors||[]).map(a=>a.name).join(', '),publisher:(rec.publishers||[]).map(p=>p.name).join(', '),year:rec.publish_date?parseInt((rec.publish_date.match(/\d{4}/)||[])[0])||null:null,pages:rec.number_of_pages||null,isbn,cover:cv||olCover(isbn),category:'',subcategory:'',dewey:dw,deweySource:auth?'ddc':'auto',source:'Open Library',language:''};}
+function fromOLSearch(doc,isbn){const auth=cleanDewey(doc.ddc&&doc.ddc[0]);return{title:doc.title||'',author:(doc.author_name||[])[0]||'',publisher:(doc.publisher||[])[0]||'',year:doc.first_publish_year||null,pages:doc.number_of_pages_median||null,isbn,cover:getBestCover(isbn,doc.cover_i||null,null),category:'',subcategory:'',dewey:auth||deweyFromSubjects([doc.subject&&doc.subject[0]],(doc.language&&doc.language[0])||''),deweySource:auth?'ddc':'auto',source:'Open Library',language:(doc.language&&doc.language[0])||''};}
+// Arricchimento: per i libri trovati su Google (senza DDC), prova a recuperare il Dewey autorevole da Open Library.
+async function enrichDeweyFromOL(isbn){
+    try{
+        for(const v of isbnVariants(isbn)){
+            const r=await fetchT(`https://openlibrary.org/api/books?bibkeys=ISBN:${v}&format=json&jscmd=data`,6000);
+            if(r.ok){const j=await r.json();const rec=j['ISBN:'+v];const c=cleanDewey(rec&&rec.classifications&&rec.classifications.dewey_decimal_class&&rec.classifications.dewey_decimal_class[0]);if(c)return c;}
+        }
+    }catch(e){}
+    return '';
+}
 
 // Impostazioni ricerca (scheda Backup)
 function loadGBooksKey(){const el=document.getElementById('gbooks-key');if(el)el.value=getGBooksKey();const v=document.getElementById('app-version');if(v)v.textContent=APP_VERSION;}
@@ -1386,7 +1414,7 @@ function showISBNResult(data,applied=true){
     const pv=document.getElementById('isbn-preview');
     const fb=olCover(data.isbn);
     const img=data.cover?`<img src="${esc(data.cover)}" alt="Copertina" data-fb="${esc(fb)}" onerror="if(this.dataset.fb&&this.src!==this.dataset.fb){this.src=this.dataset.fb;this.dataset.fb='';}else{this.style.display='none';}" style="width:96px;border-radius:6px;box-shadow:var(--shadow-sm)">`:'';
-    pv.innerHTML=`${img}<div class="isbn-preview-info"><h4>${esc(data.title||'—')}</h4><p>${esc(data.author||'')}</p><p>${[data.publisher,data.year,data.pages?data.pages+' pp.':''].filter(Boolean).join(' · ')}</p>${data.category?`<p style="font-size:.82rem;margin-top:.2rem">Categoria: <strong>${getCatName(data.category)}</strong>${data.subcategory?' — '+getSubName(data.category,data.subcategory):''}</p>`:''}<span class="isbn-source">Fonte: ${esc(data.source||'')}</span>${applied?`<p style="margin-top:.55rem;color:var(--success);font-weight:600;font-size:.85rem">&#10003; Dati applicati al modulo — controlla e salva</p>`:`<br><button class="btn btn-sm btn-success" onclick="applyISBNData()" style="margin-top:.5rem">Usa questi dati</button>`}</div>`;
+    pv.innerHTML=`${img}<div class="isbn-preview-info"><h4>${esc(data.title||'—')}</h4><p>${esc(data.author||'')}</p><p>${[data.publisher,data.year,data.pages?data.pages+' pp.':''].filter(Boolean).join(' · ')}</p>${data.category?`<p style="font-size:.82rem;margin-top:.2rem">Categoria: <strong>${getCatName(data.category)}</strong>${data.subcategory?' — '+getSubName(data.category,data.subcategory):''}</p>`:''}${data.dewey?`<p style="font-size:.82rem;margin-top:.2rem">Dewey: <strong>${esc(data.dewey)}</strong>${deweyBestLabel(data.dewey)?' — '+esc(deweyPretty(deweyBestLabel(data.dewey))):''} <span style="font-size:.72rem;color:var(--ink-muted)">(${data.deweySource==='ddc'?'da catalogo':'stimato'})</span></p>`:''}<span class="isbn-source">Fonte: ${esc(data.source||'')}</span>${applied?`<p style="margin-top:.55rem;color:var(--success);font-weight:600;font-size:.85rem">&#10003; Dati applicati al modulo — controlla e salva</p>`:`<br><button class="btn btn-sm btn-success" onclick="applyISBNData()" style="margin-top:.5rem">Usa questi dati</button>`}</div>`;
     pv.classList.add('show');
 }
 function showNetworkError(){const pv=document.getElementById('isbn-preview');pv.innerHTML=`<div style="padding:.75rem;width:100%"><p style="font-weight:600;color:var(--warning);margin-bottom:.5rem">&#9888; Ricerca non disponibile in anteprima</p><p style="font-size:.85rem;color:var(--ink-muted)">Scarica il file e aprilo nel browser per la ricerca ISBN.</p></div>`;pv.classList.add('show')}
@@ -1409,7 +1437,7 @@ function applyISBNData(silent=false){
 function onDeweyInput(){
     const code=val('f-dewey');
     const lab=document.getElementById('f-dewey-label');
-    if(lab){ const l=deweyLabel(code); lab.innerHTML = code ? (l?('<strong>'+esc(code)+'</strong> · '+esc(deweyPretty(l))):('<strong>'+esc(code)+'</strong> · <span style="color:var(--warning)">codice non riconosciuto</span>')) : 'Numero di classe Dewey (compilato in automatico dall\'ISBN, oppure «Sfoglia»).'; }
+    if(lab){ const l=deweyBestLabel(code); lab.innerHTML = code ? (l?('<strong>'+esc(code)+'</strong> · '+esc(deweyPretty(l))):('<strong>'+esc(code)+'</strong> · <span style="color:var(--warning)">numero non valido</span>')) : 'Numero di classe Dewey (compilato in automatico dall\'ISBN, oppure «Sfoglia»).'; }
     updateAutoLocation();
 }
 // Selettore / archivio Dewey. target = id campo da compilare, oppure true/'browse' per sola consultazione.
@@ -1421,15 +1449,38 @@ function openDeweyPicker(target){
     openModal('modal-dewey');
     setTimeout(()=>s.focus(),120);
 }
+function deweyRowHTML(code,label,leaf){
+    const pick=!!deweyPickTarget;
+    return `<div class="dewey-row${leaf?' leaf':''}${code.endsWith('00')?' main':''}"${pick?` onclick="pickDewey('${code}')"`:''}><span class="dewey-code">${code}</span><span class="dewey-name">${esc(deweyPretty(label))}</span></div>`;
+}
+function deweyPickBtnHTML(code){ return deweyPickTarget?`<button type="button" class="dw-pick" onclick="event.preventDefault();event.stopPropagation();pickDewey('${code}')">usa</button>`:''; }
+// Albero espandibile: 10 classi → divisioni → sezioni (tutti i numeri disponibili nell'archivio)
+function deweyTreeHTML(){
+    const d=deweyData(); let html='';
+    for(let c=0;c<10;c++){
+        const cls=c+'00'; let divHTML='';
+        for(let v=0;v<10;v++){
+            const div=''+c+v+'0'; let secHTML='';
+            for(let s=0;s<10;s++){ const sec=''+c+v+s; if(sec===div)continue; if(d[sec])secHTML+=deweyRowHTML(sec,d[sec],true); }
+            if(d[div]||secHTML){
+                const dl=d[div]?deweyPretty(d[div]):('Divisione '+div);
+                divHTML+=`<details class="dw-node dw-div"><summary><span class="dewey-code">${div}</span><span class="dewey-name">${esc(dl)}</span>${d[div]?deweyPickBtnHTML(div):''}</summary>${secHTML||'<div class="dewey-empty">nessuna ulteriore suddivisione</div>'}</details>`;
+            }
+        }
+        const cl=d[cls]?deweyPretty(d[cls]):('Classe '+cls);
+        html+=`<details class="dw-node dw-class"><summary><span class="dewey-code">${cls}</span><span class="dewey-name">${esc(cl)}</span>${d[cls]?deweyPickBtnHTML(cls):''}</summary>${divHTML||'<div class="dewey-empty">—</div>'}</details>`;
+    }
+    return html;
+}
 function renderDeweyPicker(){
-    const d=deweyData(), keys=Object.keys(d).sort();
-    const q=(document.getElementById('dewey-search').value||'').toLowerCase().trim();
-    let list = q ? keys.filter(k=>k.indexOf(q)===0||k.includes(q)||deweyPretty(d[k]).toLowerCase().includes(q)).slice(0,500)
-                 : keys.filter(k=>k.endsWith('00')); // a vuoto: le 10 classi principali
     const el=document.getElementById('dewey-list');
     if(typeof DEWEY==='undefined'){ el.innerHTML='<p style="padding:1rem;color:var(--ink-muted)">Archivio Dewey non caricato. Ricarica la pagina.</p>'; return; }
+    const q=(document.getElementById('dewey-search').value||'').toLowerCase().trim();
+    if(!q){ el.innerHTML=deweyTreeHTML(); return; } // a vuoto: albero espandibile completo
+    const d=deweyData(), keys=Object.keys(d).sort();
+    const list=keys.filter(k=>k.indexOf(q)===0||k.includes(q)||deweyPretty(d[k]).toLowerCase().includes(q)).slice(0,500);
     if(!list.length){ el.innerHTML='<p style="padding:1rem;color:var(--ink-muted);text-align:center">Nessuna voce trovata.</p>'; return; }
-    el.innerHTML=list.map(k=>`<div class="dewey-row${k.endsWith('00')?' main':''}" onclick="pickDewey('${k}')"><span class="dewey-code">${k}</span><span class="dewey-name">${esc(deweyPretty(d[k]))}</span></div>`).join('');
+    el.innerHTML=list.map(k=>deweyRowHTML(k,d[k],false)).join('');
 }
 function pickDewey(code){
     if(deweyPickTarget){
