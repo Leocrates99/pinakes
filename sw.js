@@ -2,17 +2,23 @@
    Strategia:
    - App shell (HTML, icone, manifest): cache-first  -> apertura istantanea e uso offline
    - Navigazioni: network-first con fallback alla shell in cache
-   - Librerie/font da CDN (Chart.js, Quagga, Google Fonts): stale-while-revalidate
+   - Librerie e font: ORA SELF-HOSTED in vendor/ (Protocollo §8 · D9), quindi
+     rientrano negli asset locali e non dipendono più da CDN esterne
    - Lookup ISBN (Google Books / Open Library) e copertine: solo rete, mai in cache
    Bump SHELL_CACHE quando cambi index.html o gli asset locali. */
-const SHELL_CACHE = 'pinakes-shell-v15';
-const RUNTIME_CACHE = 'pinakes-runtime-v15';
+const SHELL_CACHE = 'pinakes-shell-v16';
+const RUNTIME_CACHE = 'pinakes-runtime-v16';
 
 const SHELL_ASSETS = [
   './',
   './index.html',
   './dewey.js',
   './manifest.webmanifest',
+  // D9 · librerie e foglio font self-hosted: precache, così l'app FUNZIONA
+  // offline già dal primo avvio (prima Chart.js/ZXing/Google Fonts erano su CDN).
+  './vendor/lib/chart.umd.min.js',
+  './vendor/lib/zxing-library.min.js',
+  './vendor/fonts/fonts.css',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -21,8 +27,9 @@ const SHELL_ASSETS = [
   './icons/favicon-32.png'
 ];
 
-// host le cui risposte servono offline (librerie e font)
-const RUNTIME_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+// Nessuna CDN esterna residua per librerie/font (vedi D9). L'array resta come
+// aggancio se in futuro servisse una risorsa di terzi.
+const RUNTIME_HOSTS = [];
 // host che devono SEMPRE andare in rete (API e copertine): non sporcano la cache
 const NETWORK_ONLY_HOSTS = [
   'www.googleapis.com', 'openlibrary.org', 'covers.openlibrary.org',
@@ -67,9 +74,19 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Asset locali: cache-first
+  // Asset locali: cache-first, E memorizza ciò che scarica (prima le risposte di
+  // rete non venivano salvate: i .woff2 di vendor/fonts, non essendo nel precache,
+  // sarebbero rimasti non disponibili offline).
   if (url.origin === self.location.origin) {
-    e.respondWith(caches.match(req).then((r) => r || fetch(req)));
+    e.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const copy = resp.clone();
+          caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy));
+        }
+        return resp;
+      }))
+    );
     return;
   }
 
