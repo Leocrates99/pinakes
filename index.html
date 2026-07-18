@@ -9,6 +9,9 @@
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#1a1a2e">
     <meta name="color-scheme" content="light dark">
+    <!-- D2 · anti-flash tema: imposta [data-theme] PRIMA del paint (preferenza
+         salvata, altrimenti quella di sistema). Deve restare inline in <head>. -->
+    <script>(function(){try{var s=localStorage.getItem('biblio-theme');var t=(s==='dark'||s==='light')?s:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -35,7 +38,14 @@
             --warning:#b9791f;--warning-light:#f6ecd6;
             --danger:#c53030;--danger-light:#f6dcdc;
             --shadow-sm:0 1px 3px rgba(44,53,57,.06);--shadow:0 6px 22px rgba(44,53,57,.09);--shadow-lg:0 14px 40px rgba(44,53,57,.14);
-            --radius:6px;--radius-lg:10px;--transition:150ms ease;
+            /* Protocollo UX/UI §8 — D8: raggi allineati 8/12 (erano 6/10) */
+            --radius:8px;--radius-lg:12px;--transition:150ms ease;
+            /* D3: testo/icone su fondo accento pieno */
+            --on-accent:#ffffff;
+            /* D8: varianti di TESTO dei semantici (>=4.5:1); i *-light restano fondi */
+            --success-ink:#276749;--warning-ink:#8a5a15;--danger-ink:#9b2c2c;
+            /* D10: scala di spazio 8pt */
+            --sp-1:4px;--sp-2:8px;--sp-3:16px;--sp-4:24px;--sp-5:32px;--sp-6:48px;--sp-7:64px;
             --font-display:'Playfair Display',Georgia,'Times New Roman',serif;
             --font-body:'Source Serif 4',Georgia,serif;
             --font-ui:'Source Sans 3',system-ui,-apple-system,sans-serif;
@@ -53,6 +63,14 @@
             --warning:#fbbf24;--warning-light:rgba(251,191,36,.16);
             --danger:#f87171;--danger-light:rgba(248,113,113,.18);
             --shadow-sm:0 1px 3px rgba(0,0,0,.3);--shadow:0 6px 22px rgba(0,0,0,.4);--shadow-lg:0 14px 40px rgba(0,0,0,.5);
+            /* D3 · regola aurea del dark: l'accento SCHIARISCE (#8b7dff) quindi il
+               testo sopra dev'essere SCURO — il bianco farebbe ~2.3:1. */
+            --on-accent:#14121c;
+            --success-ink:#4ade80;--warning-ink:#fbbf24;--danger-ink:#f87171;
+        }
+        /* D1 · moto ridotto (era assente) */
+        @media (prefers-reduced-motion:reduce){
+            *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
         }
         [data-theme="dark"] header{background:linear-gradient(180deg,#2a2541 0%,#1a1530 100%);border-bottom-color:var(--parchment-dark)}
         [data-theme="dark"] .book-cover-area{background:linear-gradient(135deg,#2a2e38,#1c1f24)}
@@ -98,10 +116,10 @@
 
         .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.1rem;border:1px solid transparent;border-radius:var(--radius);cursor:pointer;font:500 .88rem 'Source Sans 3',sans-serif;transition:var(--transition);white-space:nowrap;text-decoration:none;color:var(--ink)}
         .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
-        .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{background:var(--accent-light)}
+        .btn-primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}.btn-primary:hover{background:var(--accent-light)}
         .btn-outline{border-color:var(--parchment-dark);background:var(--cream);color:var(--ink)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
-        .btn-success{background:var(--success);color:#fff}
-        .btn-danger{background:var(--danger);color:#fff}
+        .btn-success{background:var(--success);color:var(--on-accent)}
+        .btn-danger{background:var(--danger);color:var(--on-accent)}
         .btn-sm{padding:.4rem .7rem;font-size:.8rem}
         .btn-icon{background:var(--cream);border:1px solid var(--parchment-dark);padding:.5rem;font-size:1rem;border-radius:var(--radius);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);width:36px;height:36px;color:var(--ink-muted)}
         .btn-icon.active,.btn-icon:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
@@ -246,7 +264,7 @@
         .shelf-tooltip.visible{opacity:1;transform:translateY(0)}
         .shelf-tooltip strong{display:block;font-size:.92rem;margin-bottom:.15rem}
         .shelf-tooltip .tt-loc{display:inline-block;margin-top:.3rem;padding:.1rem .4rem;background:rgba(255,255,255,.15);border-radius:3px;font-family:monospace;font-size:.75rem;letter-spacing:.03em}
-        .shelf-tooltip .tt-btn{display:inline-block;margin-top:.4rem;padding:.2rem .5rem;background:var(--accent);color:#fff;border-radius:3px;font-size:.72rem;cursor:pointer;pointer-events:auto}
+        .shelf-tooltip .tt-btn{display:inline-block;margin-top:.4rem;padding:.2rem .5rem;background:var(--accent);color:var(--on-accent);border-radius:3px;font-size:.72rem;cursor:pointer;pointer-events:auto}
         .shelf-tooltip::after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:-6px;border:6px solid transparent;border-top-color:var(--ink)}
         .shelf-tooltip.below::after{bottom:auto;top:-6px;border-top-color:transparent;border-bottom-color:var(--ink)}
 
@@ -276,7 +294,7 @@
         @keyframes spin{to{transform:rotate(360deg)}}
 
         /* ═══ #20 BACK TO TOP ═══ */
-        .back-to-top{position:fixed;bottom:1.5rem;left:1.5rem;z-index:900;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:1.3rem;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(20px);pointer-events:none;transition:var(--transition)}
+        .back-to-top{position:fixed;bottom:1.5rem;left:1.5rem;z-index:900;width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--on-accent);border:none;font-size:1.3rem;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(20px);pointer-events:none;transition:var(--transition)}
         .back-to-top.visible{opacity:1;transform:translateY(0);pointer-events:auto}
 
         /* ═══ #22 PRINT STYLESHEET ═══ */
@@ -439,7 +457,7 @@
         /* Nav tabs: stato attivo editoriale (testo accento + barra sotto) */
         .nav-tabs{border:1px solid var(--parchment-dark)}
         .tab-btn{letter-spacing:.03em}
-        .tab-btn.active{background:var(--accent);color:#fff;box-shadow:0 1px 4px rgba(24,0,172,.28)}
+        .tab-btn.active{background:var(--accent);color:var(--on-accent);box-shadow:0 1px 4px rgba(24,0,172,.28)}
         /* Anello di focus accento sugli input */
         .search-wrap input:focus,.form-group input:focus,.form-group select:focus,
         .form-group textarea:focus,.filter-select:focus,.isbn-lookup-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
@@ -500,7 +518,7 @@
         @media(max-width:640px){.scan-hero{padding:1rem;gap:.75rem}.scan-hero-icon{display:none}.scan-hero-actions{width:100%}.scan-hero-actions .btn{flex:1;justify-content:center}}
 
         /* Pulsante flottante "Scansiona" — azione primaria sempre raggiungibile */
-        .fab-scan{position:fixed;bottom:1.5rem;right:1.5rem;z-index:850;display:inline-flex;align-items:center;gap:.5rem;height:54px;padding:0 1.35rem;border-radius:999px;background:var(--accent);color:#fff;border:none;font:600 .95rem/1 var(--font-ui);cursor:pointer;box-shadow:0 10px 26px rgba(24,0,172,.32);transition:var(--transition)}
+        .fab-scan{position:fixed;bottom:1.5rem;right:1.5rem;z-index:850;display:inline-flex;align-items:center;gap:.5rem;height:54px;padding:0 1.35rem;border-radius:999px;background:var(--accent);color:var(--on-accent);border:none;font:600 .95rem/1 var(--font-ui);cursor:pointer;box-shadow:0 10px 26px rgba(24,0,172,.32);transition:var(--transition)}
         .fab-scan:hover{background:var(--accent-light);transform:translateY(-2px);box-shadow:0 14px 30px rgba(24,0,172,.4)}
         .fab-scan .fab-ic{font-size:1.2rem}
         [data-theme="dark"] .fab-scan{box-shadow:0 10px 26px rgba(0,0,0,.5)}
@@ -533,7 +551,7 @@
         .dewey-row.leaf{margin-left:2.3rem}
         .dewey-row.leaf:not([onclick]){cursor:default}
         .dw-pick{margin-left:auto;align-self:center;font:600 .68rem var(--font-ui);background:var(--accent-pale);color:var(--accent);border:1px solid var(--accent-border);border-radius:99px;padding:.12rem .55rem;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
-        .dw-pick:hover{background:var(--accent);color:#fff}
+        .dw-pick:hover{background:var(--accent);color:var(--on-accent)}
         .dewey-empty{margin-left:2.3rem;padding:.3rem .6rem;font-size:.8rem;color:var(--ink-muted);font-style:italic}
     </style>
 </head>
@@ -880,7 +898,7 @@ function loadSampleBooks(){
 // ════════════════════════════════════════════════════════════════
 //  #19 DARK MODE
 // ════════════════════════════════════════════════════════════════
-function initTheme(){ const t=localStorage.getItem('biblio-theme')||'light'; document.documentElement.dataset.theme=t; updateThemeIcon(); }
+function initTheme(){ const s=localStorage.getItem('biblio-theme'); const t=(s==='dark'||s==='light')?s:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); document.documentElement.dataset.theme=t; updateThemeIcon(); }
 function toggleTheme(){ const n=document.documentElement.dataset.theme==='light'?'dark':'light'; document.documentElement.dataset.theme=n; localStorage.setItem('biblio-theme',n); updateThemeIcon(); }
 function updateThemeIcon(){ document.querySelector('.theme-toggle').textContent=document.documentElement.dataset.theme==='dark'?'☀':'☽'; }
 
