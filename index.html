@@ -73,6 +73,9 @@
         @media (prefers-reduced-motion:reduce){
             *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
         }
+        /* a11y · skip-link: invisibile finché non riceve il focus da tastiera */
+        .skip-link{position:absolute;left:8px;top:-48px;z-index:1000;background:var(--accent);color:var(--on-accent);padding:.5rem .9rem;border-radius:var(--radius);font-family:var(--font-ui);font-size:.85rem;text-decoration:none;transition:top var(--transition)}
+        .skip-link:focus{top:8px}
         [data-theme="dark"] header{background:linear-gradient(180deg,#2a2541 0%,#1a1530 100%);border-bottom-color:var(--parchment-dark)}
         [data-theme="dark"] .book-cover-area{background:linear-gradient(135deg,#2a2e38,#1c1f24)}
         [data-theme="dark"] .shelf-books{background:linear-gradient(to bottom,#2a2e38,#1c1f24)}
@@ -557,6 +560,8 @@
     </style>
 </head>
 <body>
+<!-- a11y: primo elemento focalizzabile, salta l'intestazione -->
+<a class="skip-link" href="#main-content">Salta al contenuto</a>
 <header>
     <div class="container">
         <div class="header-inner">
@@ -575,15 +580,15 @@
     </div>
 </header>
 <div class="container">
-    <nav class="nav-tabs" role="tablist">
-        <button class="tab-btn active" data-tab="catalog">Catalogo</button>
-        <button class="tab-btn" data-tab="shelving">Collocazione</button>
-        <button class="tab-btn" data-tab="stats">Statistiche</button>
-        <button class="tab-btn" data-tab="backup">Backup</button>
+    <nav class="nav-tabs" role="tablist" id="main-content" aria-label="Sezioni della biblioteca">
+        <button class="tab-btn active" data-tab="catalog" role="tab" id="tab-catalog" aria-selected="true" aria-controls="panel-catalog">Catalogo</button>
+        <button class="tab-btn" data-tab="shelving" role="tab" id="tab-shelving" aria-selected="false" aria-controls="panel-shelving">Collocazione</button>
+        <button class="tab-btn" data-tab="stats" role="tab" id="tab-stats" aria-selected="false" aria-controls="panel-stats">Statistiche</button>
+        <button class="tab-btn" data-tab="backup" role="tab" id="tab-backup" aria-selected="false" aria-controls="panel-backup">Backup</button>
     </nav>
 
     <!-- CATALOG -->
-    <section id="panel-catalog" class="tab-panel active">
+    <section id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" class="tab-panel active">
         <div class="panel-head">
             <span class="eyebrow">La collezione</span>
             <h2 class="panel-title">Catalogo</h2>
@@ -624,7 +629,7 @@
     </section>
 
     <!-- SHELVING -->
-    <section id="panel-shelving" class="tab-panel">
+    <section id="panel-shelving" role="tabpanel" aria-labelledby="tab-shelving" class="tab-panel">
         <div class="panel-head">
             <span class="eyebrow">Sugli scaffali</span>
             <h2 class="panel-title">Collocazione</h2>
@@ -671,7 +676,7 @@
     </section>
 
     <!-- STATS -->
-    <section id="panel-stats" class="tab-panel">
+    <section id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" class="tab-panel">
         <div class="panel-head">
             <span class="eyebrow">A colpo d'occhio</span>
             <h2 class="panel-title">Statistiche</h2>
@@ -690,7 +695,7 @@
     </section>
 
     <!-- BACKUP -->
-    <section id="panel-backup" class="tab-panel">
+    <section id="panel-backup" role="tabpanel" aria-labelledby="tab-backup" class="tab-panel">
         <div class="panel-head">
             <span class="eyebrow">I tuoi dati</span>
             <h2 class="panel-title">Backup ed esportazione</h2>
@@ -1020,9 +1025,10 @@ function setView(mode){
 function setupTabs(){
     document.querySelectorAll('.tab-btn').forEach(btn=>{
         btn.addEventListener('click',()=>{
-            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-selected','false');});
             document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
             btn.classList.add('active');
+            btn.setAttribute('aria-selected','true');   // a11y: lo stato non è solo visivo
             document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
             if(btn.dataset.tab==='stats') renderStats();
             if(btn.dataset.tab==='shelving') renderShelving();
