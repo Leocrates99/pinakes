@@ -52,6 +52,10 @@
             --font-ui:'Source Sans 3',system-ui,-apple-system,sans-serif;
             --font-mono:'JetBrains Mono',Consolas,monospace;
         }
+        /* D12 · sentinella del rendering progressivo: occupa l'intera riga
+           della griglia, e' alta 1px e invisibile. Quando entra nel campo
+           (con 600px di anticipo) si disegna l'infornata successiva. */
+        .catalogo-sentinella{grid-column:1/-1;height:1px}
         /* ═══ #19 DARK MODE ═══ */
         [data-theme="dark"]{
             --ink:#e8e6e1;--ink-light:#c8c5be;--ink-muted:#a8a39b;
@@ -1089,7 +1093,77 @@ function renderCatalog(){
             : '<div class="empty-state"><div class="e-icon">&#128269;</div><p style="font-weight:600;font-size:1.05rem;margin-bottom:.3rem">Nessun libro corrisponde</p><p style="color:var(--ink-muted);margin-bottom:1.1rem;font-family:var(--font-body)">Prova a cambiare la ricerca o i filtri.</p><button class="btn btn-outline" onclick="clearFilters()">Azzera filtri</button></div>';
         return;
     }
-    grid.innerHTML=filtered.map(b=>{
+    // ── Protocollo §8 · D12 — rendering PROGRESSIVO ─────────────────────────
+    // Prima l'intera lista finiva in innerHTML in un colpo solo. Misurato su questo
+    // file: a 1000 libri costa ~480ms, di cui 435 di LAYOUT su 23.000 nodi (la
+    // costruzione della stringa e' solo 48ms: il collo di bottiglia NON era il .map).
+    // A 2000 libri ~705ms, a 5000 ~1650ms. Sotto i 500 (~140ms) il problema non
+    // esiste. Percio' NON serve una virtualizzazione a finestra scorrevole — che qui
+    // costerebbe matematica dello scroll e il rischio di rompere ancore e immagini
+    // lazy: basta disegnare una prima infornata e accodare il resto quando ci si
+    // avvicina. Il costo percepito diventa costante, qualunque sia la biblioteca.
+    _catCoda = filtered;
+    _catDisegnati = 0;
+    grid.innerHTML = '';
+    disegnaInfornata(grid);
+    if(lastSavedId){setTimeout(()=>{lastSavedId=null},2100)}
+}
+
+const CATALOGO_INFORNATA = 120;          // copre abbondantemente una schermata
+const CATALOGO_ANTICIPO  = 600;          // px di margine: si disegna PRIMA di toccare il fondo
+let _catCoda = [], _catDisegnati = 0, _catSentinella = null, _catInAttesa = false;
+
+// La sentinella e' un rigo alto 1px in coda alla griglia. Non usiamo
+// IntersectionObserver: e' l'API "giusta", ma se in un ambiente non emette
+// callback il catalogo resta troncato IN SILENZIO, che e' un difetto peggiore
+// della lentezza che stiamo curando. Lo scroll invece e' roccia ovunque, e una
+// getBoundingClientRect per frame non si misura accanto ai 435ms di layout
+// risparmiati. Vedi Protocollo §8 · D12.
+function disegnaInfornata(grid){
+    const prossimi = _catCoda.slice(_catDisegnati, _catDisegnati + CATALOGO_INFORNATA);
+    if(!prossimi.length) return;
+    if(_catSentinella){ _catSentinella.remove(); _catSentinella = null; }
+    grid.insertAdjacentHTML('beforeend', prossimi.map(schedaLibroHTML).join(''));
+    _catDisegnati += prossimi.length;
+    if(_catDisegnati < _catCoda.length) armaSentinella(grid);
+    else staccaVedetta();
+}
+
+function armaSentinella(grid){
+    _catSentinella = document.createElement('div');
+    _catSentinella.className = 'catalogo-sentinella';
+    _catSentinella.setAttribute('aria-hidden','true');
+    grid.appendChild(_catSentinella);
+    attaccaVedetta();
+    // Rabbocco: se la prima infornata non riempie lo schermo (viewport alto,
+    // filtro stretto) nessuno scrollera' mai. Ricontrolliamo subito.
+    requestAnimationFrame(()=>forseAltraInfornata(grid));
+}
+
+function forseAltraInfornata(grid){
+    _catInAttesa = false;
+    if(!_catSentinella || !_catSentinella.isConnected) return;
+    const y = _catSentinella.getBoundingClientRect().top;
+    if(y - window.innerHeight < CATALOGO_ANTICIPO) disegnaInfornata(grid);
+}
+
+function vedetta(){
+    if(_catInAttesa) return;             // una sola verifica per frame
+    _catInAttesa = true;
+    requestAnimationFrame(()=>forseAltraInfornata(document.getElementById('books-grid')));
+}
+
+function attaccaVedetta(){
+    window.addEventListener('scroll', vedetta, {passive:true});
+    window.addEventListener('resize', vedetta, {passive:true});
+}
+
+function staccaVedetta(){
+    window.removeEventListener('scroll', vedetta);
+    window.removeEventListener('resize', vedetta);
+}
+
+function schedaLibroHTML(b){
         const sc=b.status.toLowerCase().replace(/ /g,'-');
         const stars=Array.from({length:5},(_,i)=>`<span class="${i<(b.rating||0)?'':'empty'}">★</span>`).join('');
         const coverHtml=b.cover?`<img src="${esc(b.cover)}" alt="${esc(b.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=book-cover-placeholder>${esc(b.title)}</div>'">`:`<div class="book-cover-placeholder">${esc(b.title)}</div>`;
@@ -1114,8 +1188,6 @@ function renderCatalog(){
                 <button class="btn btn-sm btn-outline" onclick="editBook(${b.id})">Modifica</button>
                 <button class="btn btn-sm btn-danger" onclick="requestDelete(${b.id})">Elimina</button>
             </div></div></div>`;
-    }).join('');
-    if(lastSavedId){setTimeout(()=>{lastSavedId=null},2100)}
 }
 
 function updateHeaderStats(){

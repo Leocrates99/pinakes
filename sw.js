@@ -6,7 +6,7 @@
      rientrano negli asset locali e non dipendono più da CDN esterne
    - Lookup ISBN (Google Books / Open Library) e copertine: solo rete, mai in cache
    Bump SHELL_CACHE quando cambi index.html o gli asset locali. */
-const SHELL_CACHE = 'pinakes-shell-v16';
+const SHELL_CACHE = 'pinakes-shell-v17';
 const RUNTIME_CACHE = 'pinakes-runtime-v16';
 
 const SHELL_ASSETS = [
